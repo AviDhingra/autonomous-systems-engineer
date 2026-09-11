@@ -1,0 +1,19 @@
+from typing import Protocol
+
+from ..models.domain import Device, Telemetry
+
+
+class DeviceRepository(Protocol):
+    def add(self, device: Device) -> Device: ...
+
+    def get(self, device_id: str) -> Device | None: ...
+
+    def update(self, device: Device) -> Device: ...
+
+
+class TelemetryRepository(Protocol):
+    def add(self, telemetry: Telemetry) -> Telemetry: ...
+
+    def get_by_request(self, device_id: str, request_id: str) -> Telemetry | None: ...
+
+    def list_for_device(self, device_id: str, *, limit: int = 100) -> list[Telemetry]: ...
