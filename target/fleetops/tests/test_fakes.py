@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from target.fleetops.app.models.domain import Device, Telemetry
-from fleetops.tests.fakes import FakeDeviceRepository, FakeTelemetryRepository
+from target.fleetops.tests.fakes import FakeDeviceRepository, FakeTelemetryRepository
 
 
 def test_fake_device_repository_add_and_get() -> None:
