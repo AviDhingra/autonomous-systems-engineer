@@ -1,0 +1,13 @@
+--- a/target/fleetops/app/services/telemetry.py
++++ b/target/fleetops/app/services/telemetry.py
+@@ -23,6 +23,10 @@
+     ) -> Telemetry:
+         if self._devices.get(device_id) is None:
+             raise DeviceNotFoundError(device_id)
++
++        existing = self._telemetry.get_by_request(device_id, request_id)
++        if existing is not None:
++            return existing
+ 
+         record = Telemetry(
+             id=str(uuid4()),
