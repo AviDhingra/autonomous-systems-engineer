@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -7,11 +9,11 @@ from ..services.devices import DeviceService
 from ..services.telemetry import TelemetryService
 
 
-def get_device_service(session: Session = Depends(get_session)) -> DeviceService:
+def get_device_service(session: Annotated[Session, Depends(get_session)]) -> DeviceService:
     return DeviceService(SqliteDeviceRepository(session))
 
 
-def get_telemetry_service(session: Session = Depends(get_session)) -> TelemetryService:
+def get_telemetry_service(session: Annotated[Session, Depends(get_session)]) -> TelemetryService:
     return TelemetryService(
         SqliteDeviceRepository(session),
         SqliteTelemetryRepository(session),

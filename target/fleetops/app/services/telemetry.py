@@ -1,8 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-
-from ..models.domain import Telemetry, DeviceHealth
+from ..models.domain import DeviceHealth, Telemetry
 from ..repositories.base import DeviceRepository, TelemetryRepository
 from .errors import DeviceNotFoundError
 

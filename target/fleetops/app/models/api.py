@@ -1,6 +1,9 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field
+
 from .domain import DeviceHealth
+
 
 class DeviceCreate(BaseModel):
     external_id: str = Field(min_length=1, max_length=100)

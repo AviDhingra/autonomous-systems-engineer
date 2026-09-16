@@ -24,6 +24,7 @@ class BenchmarkRunReport:
     duration_seconds: float
     pre_repair_oracle: GateResult
     post_repair_oracle: GateResult
+    visible_verification: VerificationReport
     visible_verification_passed: bool
     error: str
 
@@ -62,6 +63,7 @@ def run_scenario(
             duration_seconds=elapsed,
             pre_repair_oracle=pre_oracle,
             post_repair_oracle=post_oracle,
+            visible_verification=workflow_result.verification,
             visible_verification_passed=workflow_result.verification.passed,
             error=workflow_result.error,
         )

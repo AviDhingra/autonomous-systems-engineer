@@ -10,6 +10,7 @@ from target.fleetops.app.database import get_session
 from target.fleetops.app.main import create_app
 from target.fleetops.app.models.db import Base
 
+
 @pytest.fixture()
 def client(tmp_path: Path) -> Iterator[TestClient]:
     database_path = tmp_path / "api-test.db"

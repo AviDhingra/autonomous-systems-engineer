@@ -28,3 +28,13 @@ def test_s01_runs_end_to_end_with_scripted_agent(tmp_path: Path) -> None:
     assert report.pre_repair_oracle.passed is False
     assert report.post_repair_oracle.passed is True
     assert (tmp_path / "S01.json").is_file()
+    assert report.visible_verification.gates
+    assert {
+        gate.name
+        for gate in report.visible_verification.gates
+    } == {
+        "pytest",
+        "ruff",
+        "mypy",
+        "git_diff_check",
+    }

@@ -1,12 +1,15 @@
-from pathlib import Path
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from target.fleetops.app.models.db import Base
 from target.fleetops.app.models.domain import Device, Telemetry
-from target.fleetops.app.repositories.sqlite import SqliteDeviceRepository, SqliteTelemetryRepository
+from target.fleetops.app.repositories.sqlite import (
+    SqliteDeviceRepository,
+    SqliteTelemetryRepository,
+)
 
 
 def test_sqlite_repositories_persist_and_read(tmp_path: Path) -> None:

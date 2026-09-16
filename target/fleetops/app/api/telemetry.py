@@ -1,9 +1,11 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
 from ..models.api import DeviceHealthResponse, TelemetryCreate, TelemetryResponse
 from ..services.errors import DeviceNotFoundError
 from ..services.telemetry import TelemetryService
 from .dependencies import get_telemetry_service
-
 
 router = APIRouter(prefix="/devices/{device_id}", tags=["telemetry"])
 
@@ -12,7 +14,7 @@ router = APIRouter(prefix="/devices/{device_id}", tags=["telemetry"])
 def ingest_telemetry(
     device_id: str,
     request: TelemetryCreate,
-    service: TelemetryService = Depends(get_telemetry_service),
+    service: Annotated[TelemetryService, Depends(get_telemetry_service)],
 ) -> TelemetryResponse:
     try:
         record = service.ingest(
@@ -30,8 +32,8 @@ def ingest_telemetry(
 @router.get("/telemetry", response_model=list[TelemetryResponse])
 def list_telemetry(
     device_id: str,
+    service: Annotated[TelemetryService, Depends(get_telemetry_service)],
     limit: int = Query(default=100, ge=1, le=500),
-    service: TelemetryService = Depends(get_telemetry_service),
 ) -> list[TelemetryResponse]:
     try:
         records = service.list_for_device(device_id, limit=limit)
@@ -43,7 +45,7 @@ def list_telemetry(
 @router.get("/health", response_model=DeviceHealthResponse)
 def get_health(
     device_id: str,
-    service: TelemetryService = Depends(get_telemetry_service),
+    service: Annotated[TelemetryService, Depends(get_telemetry_service)],
 ) -> DeviceHealthResponse:
     try:
         health, last_seen = service.health(device_id)

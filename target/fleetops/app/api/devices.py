@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..models.api import DeviceCreate, DevicePatch, DeviceResponse
@@ -5,14 +7,13 @@ from ..services.devices import DeviceService
 from ..services.errors import DeviceNotFoundError
 from .dependencies import get_device_service
 
-
 router = APIRouter(prefix="/devices", tags=["devices"])
 
 
 @router.post("", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED)
 def create_device(
     request: DeviceCreate,
-    service: DeviceService = Depends(get_device_service),
+    service: Annotated[DeviceService, Depends(get_device_service)],
 ) -> DeviceResponse:
     device = service.create(
         external_id=request.external_id,
@@ -24,7 +25,7 @@ def create_device(
 @router.get("/{device_id}", response_model=DeviceResponse)
 def get_device(
     device_id: str,
-    service: DeviceService = Depends(get_device_service),
+    service: Annotated[DeviceService, Depends(get_device_service)],
 ) -> DeviceResponse:
     try:
         device = service.get(device_id)
@@ -37,7 +38,7 @@ def get_device(
 def patch_device(
     device_id: str,
     request: DevicePatch,
-    service: DeviceService = Depends(get_device_service),
+    service: Annotated[DeviceService, Depends(get_device_service)],
 ) -> DeviceResponse:
     try:
         device = service.patch(
