@@ -9,6 +9,10 @@ from ase.agent.workflow import VerifiedRepairWorkflow
 from ase.verifier.models import GateResult, VerificationReport
 from ase.verifier.patching import apply_unified_diff
 from ase.verifier.runner import verify_visible
+from ase.providers.errors import (
+    AgentRuntimeError,
+    ModelProviderError,
+)
 
 from .oracle import run_hidden_oracle
 from .scenario import Scenario
@@ -21,6 +25,8 @@ Verifier = Callable[[Path], VerificationReport]
 class BenchmarkRunReport:
     scenario_id: str
     status: str
+    episode_valid: bool
+    failure_kind: str
     duration_seconds: float
     pre_repair_oracle: GateResult
     post_repair_oracle: GateResult
@@ -48,24 +54,80 @@ def run_scenario(
 
         workflow = VerifiedRepairWorkflow(agent, verifier=verifier)
         started = time.perf_counter()
-        workflow_result = workflow.run(
-            ticket=scenario.ticket,
-            workspace=workspace,
-            policy=scenario.patch_policy,
-        )
+
+        workflow_result = None
+        episode_valid = True
+        failure_kind = ""
+        episode_error = ""
+
+        try:
+
+            workflow_result = workflow.run(
+                ticket=scenario.ticket,
+                workspace=workspace,
+                policy=scenario.patch_policy,
+            )
+
+        except ModelProviderError as exc:
+            episode_valid = False
+            failure_kind = "provider"
+            episode_error = str(exc)
+        except AgentRuntimeError as exc:
+            episode_valid = True
+            failure_kind = "agent_runtime"
+            episode_error = str(exc)
+
         elapsed = time.perf_counter() - started
 
         post_oracle = run_hidden_oracle(workspace, scenario.oracle_tests)
-        passed = workflow_result.status == "passed" and post_oracle.passed
+        #passed = workflow_result.status == "passed" and post_oracle.passed
+
+        if workflow_result is None:
+            verification = VerificationReport(
+                gates=()
+            )
+            passed = False
+
+            status = (
+                "invalid"
+                if not episode_valid
+                else "failed"
+            )
+
+        else:
+            verification = (
+                workflow_result.verification
+            )
+
+            passed = (
+                workflow_result.status == "passed"
+                and post_oracle.passed
+            )
+
+            status = (
+                "passed"
+                if passed
+                else "failed"
+            )
+
+            if not passed and not failure_kind:
+                failure_kind = "engineering"
+
+            if not episode_error:
+                episode_error = workflow_result.error
+
+
         report = BenchmarkRunReport(
             scenario_id=scenario.config.scenario_id,
-            status="passed" if passed else "failed",
+            status=status,
+            episode_valid=episode_valid,
+            failure_kind=failure_kind,
             duration_seconds=elapsed,
             pre_repair_oracle=pre_oracle,
             post_repair_oracle=post_oracle,
-            visible_verification=workflow_result.verification,
-            visible_verification_passed=workflow_result.verification.passed,
-            error=workflow_result.error,
+            visible_verification=verification,
+            visible_verification_passed=verification.passed,
+            error=episode_error,
         )
 
         results_dir.mkdir(parents=True, exist_ok=True)

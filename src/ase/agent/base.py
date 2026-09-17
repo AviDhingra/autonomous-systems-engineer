@@ -25,6 +25,7 @@ class EngineeringAgent(Protocol):
         self,
         ticket: str,
         investigation: Investigation,
+        diagnosis: Diagnosis,
         tools: RepositoryTools,
     ) -> PatchProposal: ...
 

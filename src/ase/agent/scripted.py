@@ -38,9 +38,10 @@ class ScriptedEngineeringAgent:
         self,
         ticket: str,
         investigation: Investigation,
+        diagnosis: Diagnosis,
         tools: RepositoryTools,
     ) -> PatchProposal:
-        del ticket, investigation, tools
+        del ticket, investigation, tools, diagnosis
         return PatchProposal(
             summary="Restore idempotent telemetry retry handling.",
             diff=self._patch,

@@ -38,6 +38,12 @@ from ase.providers.settings import (
     ModelSettings,
 )
 
+from ase.providers.errors import (
+    ModelOutputError,
+    ToolBudgetExceeded,
+    raise_provider_error,
+)
+
 class ChatModelEngineeringAgent:
     def __init__(
         self,
@@ -81,9 +87,16 @@ class ChatModelEngineeringAgent:
         final_summary = ""
 
         while True:
-            response = model_with_tools.invoke(
-                messages
-            )
+            try:
+                response = model_with_tools.invoke(
+                    messages
+                )
+            except Exception as exc:
+                raise_provider_error(
+                    provider=self._settings.provider,
+                    stage="investigation",
+                    exc=exc,
+                )
             messages.append(response)
 
             if not response.tool_calls:
@@ -99,9 +112,10 @@ class ChatModelEngineeringAgent:
                     tool_call_count
                     > self._settings.max_tool_calls
                 ):
-                    raise RuntimeError(
+                    raise ToolBudgetExceeded(
                         "investigation exceeded "
-                        "maximum tool calls"
+                        f"maximum tool calls "
+                        f"({self._settings.max_tool_calls})"
                     )
 
                 tool_name = call["name"]
@@ -178,10 +192,15 @@ class ChatModelEngineeringAgent:
             ]
         )
 
-        assert isinstance(
+        if not isinstance(
             result,
             DiagnosisOutput,
-        )
+        ):
+            raise ModelOutputError(
+                "diagnosis: provider returned "
+                "an unexpected structured result"
+            )
+
 
         return Diagnosis(
             root_cause=result.root_cause,
@@ -243,10 +262,14 @@ class ChatModelEngineeringAgent:
             ]
         )
 
-        assert isinstance(
+        if not isinstance(
             result,
             PatchOutput,
-        )
+        ):
+            raise ModelOutputError(
+                "patch_proposal: provider returned "
+                "an unexpected structured result"
+            )
 
         return PatchProposal(
             summary=result.summary,
@@ -308,10 +331,14 @@ class ChatModelEngineeringAgent:
             ]
         )
 
-        assert isinstance(
+        if not isinstance(
             result,
             RepairOutput,
-        )
+        ):
+            raise ModelOutputError(
+                "repair_patch: provider returned "
+                "an unexpected structured result"
+            )
 
         return PatchProposal(
             summary=result.summary,
