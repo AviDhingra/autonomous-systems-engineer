@@ -1,6 +1,15 @@
 from ase.tools.repository import RepositoryTools
 
-from .models import Investigation, PatchProposal
+from ase.verifier.models import (
+    VerificationReport,
+)
+
+from .models import (
+    Diagnosis,
+    Investigation,
+    PatchProposal,
+)
+
 
 
 class ScriptedEngineeringAgent:
@@ -35,4 +44,56 @@ class ScriptedEngineeringAgent:
         return PatchProposal(
             summary="Restore idempotent telemetry retry handling.",
             diff=self._patch,
+        )
+
+
+    def diagnose(
+        self,
+        ticket: str,
+        investigation: Investigation,
+        tools: RepositoryTools,
+    ) -> Diagnosis:
+        del ticket, investigation, tools
+
+        return Diagnosis(
+            root_cause=(
+                "Telemetry ingestion is missing "
+                "the request-id idempotency check."
+            ),
+            evidence_paths=(
+                "target/fleetops/app/services/"
+                "telemetry.py",
+            ),
+            affected_files=(
+                "target/fleetops/app/services/"
+                "telemetry.py",
+            ),
+            proposed_change=(
+                "Return the existing telemetry "
+                "record before creating a new one."
+            ),
+            confidence=1.0,
+        )
+
+
+    def repair_patch(
+        self,
+        ticket: str,
+        investigation: Investigation,
+        diagnosis: Diagnosis,
+        previous: PatchProposal,
+        verification: VerificationReport,
+        tools: RepositoryTools,
+    ) -> PatchProposal:
+        del (
+            ticket,
+            investigation,
+            diagnosis,
+            previous,
+            verification,
+            tools,
+        )
+        raise RuntimeError(
+            "scripted reference repair should "
+            "not require a second attempt"
         )

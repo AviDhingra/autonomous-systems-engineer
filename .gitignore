@@ -7,3 +7,6 @@ __pycache__/
 *.db
 learning_lab
 evals
+.env
+.env.*
+!.env.example

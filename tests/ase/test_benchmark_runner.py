@@ -33,8 +33,5 @@ def test_s01_runs_end_to_end_with_scripted_agent(tmp_path: Path) -> None:
         gate.name
         for gate in report.visible_verification.gates
     } == {
-        "pytest",
-        "ruff",
-        "mypy",
-        "git_diff_check",
+        "fake_visible"
     }

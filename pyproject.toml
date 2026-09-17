@@ -16,7 +16,6 @@ dependencies = [
   "langgraph>=1.2,<2",
   "langchain-anthropic>=1.1,<2",
   "langchain-ollama>=1,<2",
-
 ]
 
 [project.optional-dependencies]
