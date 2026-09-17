@@ -9,6 +9,9 @@ from ase.benchmark.runner import run_scenario
 from ase.benchmark.scenario import Scenario
 from ase.providers.factory import build_chat_model
 from ase.providers.settings import ModelSettings
+from ase.agent.base import (
+    EngineeringAgent,
+)
 
 
 def main() -> None:
@@ -40,6 +43,8 @@ def main() -> None:
     scenario = Scenario.load(
         project_root / args.scenario
     )
+
+    agent: EngineeringAgent
 
     if args.agent == "scripted":
         agent = ScriptedEngineeringAgent(

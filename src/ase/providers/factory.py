@@ -2,6 +2,7 @@ from langchain_core.language_models.chat_models import (
     BaseChatModel,
 )
 
+
 from .settings import ModelSettings
 
 
@@ -14,8 +15,9 @@ def build_chat_model(
         )
 
         return ChatAnthropic(
-            model=settings.model,
-            max_tokens=8192,
+            model_name=settings.model,
+            max_tokens_to_sample=8192,
+            stop=None,
             max_retries=2,
             timeout=120,
         )
