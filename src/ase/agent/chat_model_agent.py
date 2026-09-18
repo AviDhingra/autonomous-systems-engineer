@@ -44,6 +44,35 @@ from ase.providers.errors import (
     raise_provider_error,
 )
 
+from typing import (
+    Any,
+    TypeVar,
+)
+
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
+from pydantic import BaseModel
+
+from ase.observability.usage import (
+    ModelUsage,
+    ModelUsageSnapshot,
+)
+from ase.providers.errors import (
+    ModelOutputError,
+    ToolBudgetExceeded,
+    raise_provider_error,
+)
+
+StructuredT = TypeVar(
+    "StructuredT",
+    bound=BaseModel,
+)
+
 class ChatModelEngineeringAgent:
     def __init__(
         self,
@@ -53,6 +82,7 @@ class ChatModelEngineeringAgent:
     ) -> None:
         self._model = model
         self._settings = settings
+        self._usage = ModelUsage()
 
 
     def investigate(
