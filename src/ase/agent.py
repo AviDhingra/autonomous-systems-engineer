@@ -3,6 +3,7 @@ from pathlib import Path
 from anthropic import Anthropic
 from anthropic.types import MessageParam, ToolParam, ToolResultBlockParam
 
+from ase.models import FixProposal
 from ase.tools import read_file, search_code
 
 MODEL = "claude-sonnet-5"
@@ -48,15 +49,17 @@ TOOLS: list[ToolParam] = [
 ]
 
 
-SYSTEM_PROMPT = """You are investigating a bug in the FleetOps Python backend.
-Use the provided read-only tools to inspect repository evidence before concluding.
-You may inspect FleetOps application code and tests, but do not ask to modify files.
-Do not suggest changing tests merely to make a failure pass.
-For this stage, do not output replacement source code or a patch.
-When you have enough evidence, return an engineering diagnosis that names the
-relevant application file and function, explains the root cause, and states the
-intended behavior.
+SYSTEM_PROMPT = """You are repairing a bug in the FleetOps Python backend.
+Use the provided read-only tools to inspect repository evidence before proposing a fix.
+You may inspect FleetOps application code and tests, but do not propose changing tests
+merely to make a failure pass.
+Return exactly one fix for one existing file inside target/fleetops/app/.
+The file_path must be repository-relative.
+The explanation must state the root cause and why the proposed change fixes it.
+The new_content must contain the complete corrected UTF-8 text of that file, not a diff.
+Do not propose changes to tests, scenarios, src/ase, pyproject.toml, or other files.
 """
+
 
 
 def _get_string_argument(tool_input: dict[str, object], name: str) -> str:
@@ -90,7 +93,7 @@ def _run_tool(
 
 
 
-def investigate_ticket(repo_root: Path, ticket: str) -> str:
+def propose_fix(repo_root: Path, ticket: str) -> FixProposal:
     client = Anthropic()
 
     messages: list[MessageParam] = [
@@ -101,7 +104,7 @@ def investigate_ticket(repo_root: Path, ticket: str) -> str:
     ]
 
     while True:
-        response = client.messages.create(
+        response = client.messages.parse(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
@@ -111,6 +114,7 @@ def investigate_ticket(repo_root: Path, ticket: str) -> str:
                 "type": "auto",
                 "disable_parallel_tool_use": True,
             },
+            output_format=FixProposal,
         )
 
         if response.stop_reason == "tool_use":
@@ -161,7 +165,7 @@ def investigate_ticket(repo_root: Path, ticket: str) -> str:
                 f"{response.stop_reason}"
             )
 
-        text = "\n".join(
+        """ text = "\n".join(
             block.text
             for block in response.content
             if block.type == "text"
@@ -170,4 +174,13 @@ def investigate_ticket(repo_root: Path, ticket: str) -> str:
         if not text:
             raise RuntimeError("Claude completed the turn without diagnosis text")
 
-        return text
+        return text """
+
+        proposal = response.parsed_output
+
+        if proposal is None:
+            raise RuntimeError(
+                "Claude completed the turn without a valid FixProposal"
+            )
+
+        return proposal
