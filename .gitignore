@@ -10,3 +10,4 @@ evals
 .env
 .env.*
 !.env.example
+*.zip
