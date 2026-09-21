@@ -1,8 +1,0 @@
-{
-  "scenario_id": "S01",
-  "title": "Duplicate telemetry after retry",
-  "category": "idempotency",
-  "allowed_patch_prefixes": ["target/fleetops/app/"],
-  "max_changed_files": 2,
-  "max_changed_lines": 60
-}
