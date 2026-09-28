@@ -7,7 +7,7 @@ happens rather than planned in fine-grained detail up front.
 
 No Project 2 code exists yet. Milestone 1 starts from zero.
 
-## Milestone 1 — Durable core
+## Milestone 1 — Durable core — **Complete**
 
 Get the skeleton right before layering anything else on top of it, since
 every later milestone depends on jobs actually being resumable.
