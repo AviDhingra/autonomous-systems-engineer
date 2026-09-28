@@ -16,6 +16,7 @@ class JobRow(Base):
     status: Mapped[str] = mapped_column(String(30))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class CheckpointRow(Base):
@@ -25,5 +26,6 @@ class CheckpointRow(Base):
     job_id: Mapped[str] = mapped_column(String(36), ForeignKey("jobs.id"), index=True)
     step: Mapped[str] = mapped_column(String(30))
     phase: Mapped[str] = mapped_column(String(10))
+    attempt: Mapped[int] = mapped_column(Integer, default=1)
     state: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

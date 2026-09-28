@@ -15,12 +15,14 @@ def test_create_job_starts_pending(tmp_path: Path) -> None:
 
     assert job.status is JobStatus.PENDING
     assert job.scenario == "S02-unsupported-patch-fields"
+    assert job.retry_count == 0
 
     reloaded = store.get_job(job.id)
     assert reloaded is not None
     assert reloaded.id == job.id
     assert reloaded.scenario == job.scenario
     assert reloaded.status == job.status
+    assert reloaded.retry_count == 0
 
 
 def test_get_job_returns_none_for_missing_id(tmp_path: Path) -> None:
@@ -57,6 +59,30 @@ def test_add_and_list_checkpoints_in_order(tmp_path: Path) -> None:
         (StepName.APPLY, CheckpointPhase.BEFORE),
     ]
     assert checkpoints[1].state == {"file_path": "a.py"}
+    assert all(c.attempt == 1 for c in checkpoints)
+
+
+def test_add_checkpoint_records_attempt(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    job = store.create_job("S02-unsupported-patch-fields")
+
+    store.add_checkpoint(job.id, StepName.PROPOSE, CheckpointPhase.BEFORE, attempt=2)
+    checkpoints = store.list_checkpoints(job.id)
+
+    assert checkpoints[0].attempt == 2
+
+
+def test_increment_retry_count(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    job = store.create_job("S02-unsupported-patch-fields")
+
+    once = store.increment_retry_count(job.id)
+    assert once.retry_count == 1
+
+    twice = store.increment_retry_count(job.id)
+    assert twice.retry_count == 2
+
+    assert store.get_job(job.id).retry_count == 2  # type: ignore[union-attr]
 
 
 def test_find_active_job_skips_terminal_jobs(tmp_path: Path) -> None:

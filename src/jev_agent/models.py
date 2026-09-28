@@ -36,6 +36,7 @@ class Job:
     status: JobStatus
     created_at: datetime
     updated_at: datetime
+    retry_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,5 +45,6 @@ class Checkpoint:
     job_id: str
     step: StepName
     phase: CheckpointPhase
+    attempt: int = 1
     state: dict[str, object] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))

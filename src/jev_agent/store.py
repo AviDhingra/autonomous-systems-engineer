@@ -25,6 +25,7 @@ def _job_from_row(row: JobRow) -> Job:
         status=JobStatus(row.status),
         created_at=row.created_at,
         updated_at=row.updated_at,
+        retry_count=row.retry_count,
     )
 
 
@@ -34,6 +35,7 @@ def _checkpoint_from_row(row: CheckpointRow) -> Checkpoint:
         job_id=row.job_id,
         step=StepName(row.step),
         phase=CheckpointPhase(row.phase),
+        attempt=row.attempt,
         state=json.loads(row.state),
         created_at=row.created_at,
     )
@@ -64,6 +66,7 @@ class JobStore:
             status=JobStatus.PENDING.value,
             created_at=now,
             updated_at=now,
+            retry_count=0,
         )
         with self._session_factory() as session:
             session.add(row)
@@ -101,17 +104,30 @@ class JobStore:
             session.commit()
             return _job_from_row(row)
 
+    def increment_retry_count(self, job_id: str) -> Job:
+        """Bump a job's retry count by one, marking the start of a new attempt."""
+        with self._session_factory() as session:
+            row = session.get(JobRow, job_id)
+            if row is None:
+                raise KeyError(job_id)
+            row.retry_count += 1
+            row.updated_at = datetime.now(UTC)
+            session.commit()
+            return _job_from_row(row)
+
     def add_checkpoint(
         self,
         job_id: str,
         step: StepName,
         phase: CheckpointPhase,
         state: dict[str, object] | None = None,
+        attempt: int = 1,
     ) -> Checkpoint:
         row = CheckpointRow(
             job_id=job_id,
             step=step.value,
             phase=phase.value,
+            attempt=attempt,
             state=json.dumps(state or {}),
             created_at=datetime.now(UTC),
         )

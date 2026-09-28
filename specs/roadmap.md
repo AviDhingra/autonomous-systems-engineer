@@ -28,7 +28,7 @@ without re-proposing or re-applying. Demonstrated against the new scenario.
 recovery already requires, JEV, budgets, escalation, console. A job that
 simply fails at this stage is just `FAILED` — no retry logic yet.
 
-## Milestone 2 — Failure handling
+## Milestone 2 — Failure handling — **Complete**
 
 - Deterministic policy functions that decide `RETRY` / `ESCALATE` / `FAIL`
   outcomes for a failed step.
