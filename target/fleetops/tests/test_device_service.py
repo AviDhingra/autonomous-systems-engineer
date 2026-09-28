@@ -35,3 +35,15 @@ def test_patch_preserves_omitted_fields() -> None:
 
     assert updated.firmware_version == "1.5.0"
     assert updated.display_name == "Sorter A"
+
+
+def test_patch_rejects_unsupported_fields() -> None:
+    service = DeviceService(FakeDeviceRepository())
+    created = service.create(
+        external_id="robot-001",
+        firmware_version="1.4.0",
+        display_name="Sorter A",
+    )
+
+    with pytest.raises(ValueError, match="unsupported Device fields"):
+        service.patch(created.id, changes={"frimware_version": "2.0.0"})

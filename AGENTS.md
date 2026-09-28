@@ -19,8 +19,10 @@ repository.
   `specs/architecture.md`, and `specs/roadmap.md` before doing any Project 2
   work. They are the source of truth for what Project 2 is and how it's
   structured.
-- `src/jev_agent/` (not yet created) — where Project 2 code will live, per
-  `specs/architecture.md`.
+- `src/jev_agent/` — Project 2's code, per `specs/architecture.md`. Governs
+  runs of Project 1 as durable jobs; calls Project 1's public functions, does
+  not modify them.
+- `tests/jev_agent/` — Project 2's tests, parallel to `tests/ase/`.
 
 ## What Project 2 is
 
@@ -60,11 +62,13 @@ exists yet — only the spec-driven-development setup (this file plus
 - Run checks from the repo root:
   ```powershell
   python -m pytest -q
-  python -m ruff check src/ase tests/ase target/fleetops
-  python -m mypy src/ase target/fleetops
+  python -m ruff check src/ase tests/ase target/fleetops src/jev_agent tests/jev_agent
+  python -m mypy src/ase target/fleetops src/jev_agent
   ```
-  (Project 2 will extend these commands to cover `src/jev_agent` /
-  `tests/jev_agent` once that code exists — see `specs/architecture.md`.)
+  (`mypy` covers `src/jev_agent`, not `tests/jev_agent` — mirroring that
+  `tests/ase` isn't type-checked either. `pytest -q` alone already covers
+  `tests/jev_agent` since `testpaths` in `pyproject.toml` includes `tests`
+  recursively.)
 - `ANTHROPIC_API_KEY` must be available as an environment variable to run
   the agent.
 - Mirror existing test layout: new tests for Project 2 go in

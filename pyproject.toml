@@ -23,7 +23,7 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ase", "target/fleetops"]
+packages = ["src/ase", "src/jev_agent", "target/fleetops"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "target/fleetops/tests"]
