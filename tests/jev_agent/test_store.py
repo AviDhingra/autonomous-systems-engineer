@@ -298,6 +298,76 @@ def test_list_jobs_newest_first(tmp_path: Path) -> None:
     assert [job.id for job in store.list_jobs()] == [second.id, first.id]
 
 
+def test_simulation_marker_round_trips(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    real = store.create_job("S")
+    simulated = store.create_job("S", simulation="retry-then-pass")
+
+    assert real.simulation is None
+    assert simulated.simulation == "retry-then-pass"
+    assert store.get_job(real.id).simulation is None  # type: ignore[union-attr]
+    assert store.get_job(simulated.id).simulation == "retry-then-pass"  # type: ignore[union-attr]
+    # A status change must not drop the marker.
+    store.transition(simulated.id, JobStatus.RUNNING, 1, "attempt started")
+    assert store.get_job(simulated.id).simulation == "retry-then-pass"  # type: ignore[union-attr]
+
+
+def _filter_fixture(store: JobStore) -> dict[str, str]:
+    real = store.create_job("S")
+    happy = store.create_job("S", simulation="happy-path")
+    budget = store.create_job("S", simulation="retry-budget")
+    store.update_job_status(budget.id, JobStatus.WAITING_ON_ESCALATION)
+    return {"real": real.id, "happy": happy.id, "budget": budget.id}
+
+
+def test_list_jobs_filters_by_status(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    ids = _filter_fixture(store)
+
+    waiting = store.list_jobs(status=JobStatus.WAITING_ON_ESCALATION)
+    pending = store.list_jobs(status=JobStatus.PENDING)
+
+    assert [job.id for job in waiting] == [ids["budget"]]
+    assert {job.id for job in pending} == {ids["real"], ids["happy"]}
+
+
+def test_list_jobs_filters_simulated_or_real(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    ids = _filter_fixture(store)
+
+    assert {job.id for job in store.list_jobs(simulated=True)} == {ids["happy"], ids["budget"]}
+    assert [job.id for job in store.list_jobs(simulated=False)] == [ids["real"]]
+    assert len(store.list_jobs(simulated=None)) == 3
+
+
+def test_list_jobs_filters_by_story(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    ids = _filter_fixture(store)
+
+    assert [job.id for job in store.list_jobs(story="happy-path")] == [ids["happy"]]
+    assert store.list_jobs(story="no-such-story") == []
+
+
+def test_list_jobs_filters_by_id_prefix(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    ids = _filter_fixture(store)
+
+    assert [job.id for job in store.list_jobs(id_prefix=ids["happy"][:8])] == [ids["happy"]]
+    assert len(store.list_jobs(id_prefix="")) == 3
+    # LIKE wildcards in user input are literal, not patterns.
+    assert store.list_jobs(id_prefix="%") == []
+    assert store.list_jobs(id_prefix="_") == []
+
+
+def test_list_jobs_filters_combine(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    ids = _filter_fixture(store)
+
+    combined = store.list_jobs(status=JobStatus.PENDING, simulated=True)
+
+    assert [job.id for job in combined] == [ids["happy"]]
+
+
 def test_list_pending_escalations_excludes_resolved(tmp_path: Path) -> None:
     store = _store(tmp_path)
     _, first = _escalated(store, "a")

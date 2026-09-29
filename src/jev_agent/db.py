@@ -19,6 +19,7 @@ class JobRow(Base):
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     max_retries: Mapped[int] = mapped_column(Integer, default=2)
     max_wall_clock_seconds: Mapped[float] = mapped_column(Float, default=1800.0)
+    simulation: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
 
 
 class CheckpointRow(Base):

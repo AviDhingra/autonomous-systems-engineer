@@ -37,6 +37,7 @@ def _job_from_row(row: JobRow) -> Job:
             max_retries=row.max_retries,
             max_wall_clock_seconds=row.max_wall_clock_seconds,
         ),
+        simulation=row.simulation,
     )
 
 
@@ -132,7 +133,14 @@ class JobStore:
         _check_schema(self._engine)
         Base.metadata.create_all(self._engine)
 
-    def create_job(self, scenario: str, budget: Budget = DEFAULT_BUDGET) -> Job:
+    def create_job(
+        self,
+        scenario: str,
+        budget: Budget = DEFAULT_BUDGET,
+        simulation: str | None = None,
+    ) -> Job:
+        """Create a `PENDING` job. `simulation` names the console story that
+        drives a simulated run; `None` (the default) means a real run."""
         now = datetime.now(UTC)
         row = JobRow(
             id=str(uuid4()),
@@ -143,17 +151,35 @@ class JobStore:
             retry_count=0,
             max_retries=budget.max_retries,
             max_wall_clock_seconds=budget.max_wall_clock_seconds,
+            simulation=simulation,
         )
         with self._session_factory() as session:
             session.add(row)
             session.commit()
         return _job_from_row(row)
 
-    def list_jobs(self) -> list[Job]:
-        """All jobs, newest first."""
+    def list_jobs(
+        self,
+        status: JobStatus | None = None,
+        simulated: bool | None = None,
+        story: str | None = None,
+        id_prefix: str | None = None,
+    ) -> list[Job]:
+        """Jobs, newest first, optionally narrowed. Every filter left as
+        `None` is not applied; `simulated=False` means real runs only."""
+        query = select(JobRow).order_by(JobRow.created_at.desc())
+        if status is not None:
+            query = query.where(JobRow.status == status.value)
+        if simulated is True:
+            query = query.where(JobRow.simulation.is_not(None))
+        elif simulated is False:
+            query = query.where(JobRow.simulation.is_(None))
+        if story is not None:
+            query = query.where(JobRow.simulation == story)
+        if id_prefix:
+            query = query.where(JobRow.id.startswith(id_prefix, autoescape=True))
         with self._session_factory() as session:
-            rows = session.scalars(select(JobRow).order_by(JobRow.created_at.desc()))
-            return [_job_from_row(row) for row in rows]
+            return [_job_from_row(row) for row in session.scalars(query)]
 
     def get_job(self, job_id: str) -> Job | None:
         with self._session_factory() as session:
