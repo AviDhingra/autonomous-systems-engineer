@@ -64,24 +64,25 @@ python -m jev_agent.console --database-url sqlite:///demo_console.db
 
 Open `http://127.0.0.1:8000` and confirm each item:
 
-- [ ] Job list shows all statuses: `succeeded`, `failed`,
+- [x] Job list shows all statuses: `succeeded`, `failed`,
       `waiting_on_escalation` (and no stale `running` jobs).
-- [ ] **Interrupt-and-resume job:** history shows the resume at `VERIFY`
-      with no second `PROPOSE`/`APPLY` checkpoint pair for that attempt.
-- [ ] **Bounded retry job:** history shows the failed `VERIFY`, a retry
+- [x] **Interrupt-and-resume job:** the attempt shows one `PROPOSE` and one
+      `APPLY`, and the `VERIFY` row is marked "resumed after interruption
+      (started 2 times)".
+- [x] **Bounded retry job:** history shows the failed `VERIFY`, a retry
       event, and a passing second attempt; rollback shown before retry.
-- [ ] **JEV-informed job:** history shows the judgment (classification and
+- [x] **JEV-informed job:** history shows the judgment (classification and
       confidence) and the policy outcome that followed it.
-- [ ] **Retry-budget escalation:** job page shows retries used = max, the
+- [x] **Retry-budget escalation:** job page shows retries used = max, the
       escalation reason, and the failure output that explains it.
-- [ ] **Wall-clock escalation:** job page shows elapsed ≥ max and reason
+- [x] **Wall-clock escalation:** job page shows elapsed ≥ max and reason
       `wall_clock_exceeded`.
-- [ ] `/escalations` lists the pending escalations; resolving one with a
+- [x] `/escalations` lists the pending escalations; resolving one with a
       note moves it out of pending, adds a history entry, and leaves the job
       `waiting_on_escalation`.
 - [ ] The page is understandable to someone who did not build it: labels are
       plain-language, no raw JSON dumps as the primary view.
-- [ ] Stopping the server and restarting shows the same data (state is in
+- [x] Stopping the server and restarting shows the same data (state is in
       the store, not the process).
 - [ ] With a job in a running state (seed or a manual `demo_*` run against
       the same DB), the page updates without a manual reload; with the
@@ -93,6 +94,7 @@ Saved under `specs/2026-09-29-execution-console/screenshots/` (browser
 captures of the seeded demo):
 
 - `jobs.png` — job list with the mix of statuses.
+- `job-interrupted.png` — the interrupt-and-resume job (VERIFY resumed).
 - `job-retry.png` — detail of the bounded-retry job (attempts, budget panel).
 - `job-jev.png` — history showing a JEV judgment and the policy outcome.
 - `job-escalated.png` — an escalated job with its escalation context.

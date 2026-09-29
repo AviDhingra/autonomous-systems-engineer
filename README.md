@@ -60,6 +60,19 @@ python -m ase.main
 
 The final command asks Claude to investigate, applies one validated application-file replacement, shows the resulting Git state, and runs pytest + Ruff + mypy.
 
+## Project 2 — governed jobs and the execution console
+
+`src/jev_agent/` runs the pipeline above as a durable, resumable, policy-bounded job (checkpoints, recovery, bounded retries, a JEV judgment, budgets, escalation, execution history). See `specs/` for the design. The execution console is a local, read-mostly web view over the same SQLite store; its one write action is resolving an escalation.
+
+To see it without spending any API credit, seed a demo database with fake steps and open the console:
+
+```powershell
+python -m jev_agent.demo_console_seed --database-url sqlite:///./demo_console.db
+python -m jev_agent.console --database-url sqlite:///./demo_console.db
+```
+
+Then open <http://127.0.0.1:8000>. The seed creates one job per story: interrupt-and-resume, bounded retry, a JEV-informed retry and stop, retry-budget and wall-clock escalations, a resolved escalation, and a failed job. It refuses to write into a database that already has jobs unless you pass `--reset`. The console binds to `127.0.0.1` only and has no authentication. To browse the store real runs write to, launch it with no `--database-url` (it reads `./jev_agent.db`).
+
 ## Requirements
 
 - Python environment with the project installed

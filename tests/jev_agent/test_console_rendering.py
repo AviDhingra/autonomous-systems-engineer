@@ -258,3 +258,32 @@ def test_judge_error_event_is_not_shown_as_a_judgment() -> None:
     assert view.judgment is None
     assert view.title.startswith("JEV judgment unavailable")
     assert "RuntimeError: JEV unavailable" in view.details
+
+
+def test_step_view_notes_resume_after_interruption() -> None:
+    views = step_views(
+        [
+            _cp(StepName.VERIFY, CheckpointPhase.BEFORE),
+            _cp(StepName.VERIFY, CheckpointPhase.BEFORE),
+            _cp(StepName.VERIFY, CheckpointPhase.AFTER, {"passed": True, "checks": []}),
+        ]
+    )
+
+    assert views[0].state == "done"
+    assert "resumed after interruption (started 2 times)" in views[0].detail
+
+
+def test_seeded_interrupted_job_page_shows_resume(tmp_path: Path) -> None:
+    from unittest import mock
+
+    from jev_agent import demo_console_seed
+
+    url = f"sqlite:///{tmp_path / 'resume.db'}"
+    store = JobStore(url)
+    with mock.patch.object(demo_console_seed, "WALL_CLOCK_SECONDS", 0.05):
+        jobs = demo_console_seed.seed_demo(store)
+
+    page = TestClient(create_app(url)).get(f"/jobs/{jobs['interrupted'].id}").text
+
+    assert "resumed after interruption" in page
+    assert page.count("Attempt ") == 1

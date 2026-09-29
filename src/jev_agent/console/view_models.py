@@ -168,7 +168,13 @@ class StepView:
     detail: str
 
 
-def _step_view(step: str, before: Checkpoint | None, after: Checkpoint | None) -> StepView:
+def _resumed_note(starts: int) -> str:
+    """More than one `before` checkpoint in an attempt means the step was
+    re-entered: the process was interrupted mid-step and the job resumed."""
+    return f" · resumed after interruption (started {starts} times)" if starts > 1 else ""
+
+
+def _step_view(step: str, starts: int, after: Checkpoint | None) -> StepView:
     if after is None:
         return StepView(step, "started", "begun; no durable result")
     state = after.state
@@ -180,25 +186,28 @@ def _step_view(step: str, before: Checkpoint | None, after: Checkpoint | None) -
             else ""
         )
         if state.get("passed") is False:
-            return StepView(step, "failed", f"checks: {names}" if names else "verification failed")
-        return StepView(step, "done", f"all checks passed ({names})" if names else "passed")
+            detail = f"checks: {names}" if names else "verification failed"
+            return StepView(step, "failed", detail + _resumed_note(starts))
+        detail = f"all checks passed ({names})" if names else "passed"
+        return StepView(step, "done", detail + _resumed_note(starts))
     file_path = state.get("file_path")
-    return StepView(step, "done", str(file_path) if file_path else "completed")
+    detail = str(file_path) if file_path else "completed"
+    return StepView(step, "done", detail + _resumed_note(starts))
 
 
 def step_views(checkpoints: list[Checkpoint]) -> list[StepView]:
     """The steps an attempt reached, in pipeline order, with their outcome."""
     views: list[StepView] = []
     for step in STEP_ORDER:
-        before = next(
-            (c for c in checkpoints if c.step is step and c.phase is CheckpointPhase.BEFORE), None
+        starts = sum(
+            1 for c in checkpoints if c.step is step and c.phase is CheckpointPhase.BEFORE
         )
         after = next(
             (c for c in checkpoints if c.step is step and c.phase is CheckpointPhase.AFTER), None
         )
-        if before is None and after is None:
+        if starts == 0 and after is None:
             continue
-        views.append(_step_view(step.value, before, after))
+        views.append(_step_view(step.value, starts, after))
     return views
 
 

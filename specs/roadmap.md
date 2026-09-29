@@ -5,7 +5,7 @@ of the system. This roadmap is intentionally coarse — a handful of large
 milestones, each bundling related capabilities, updated as work actually
 happens rather than planned in fine-grained detail up front.
 
-No Project 2 code exists yet. Milestone 1 starts from zero.
+Milestones 1-5 are complete; v1 is done. See the sections below.
 
 ## Milestone 1 — Durable core — **Complete**
 
@@ -71,7 +71,7 @@ remains the thing that actually sets the job's next state.
 budget and escalates, with a readable record of why, in the same store used
 by Milestone 1.
 
-## Milestone 5 — Execution console
+## Milestone 5 — Execution console — **Complete**
 
 - Small local FastAPI app reading the same SQLite store: job list, job
   detail (checkpoints, step results), execution history, pending
