@@ -5,11 +5,13 @@ from uuid import uuid4
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from jev_agent.db import Base, CheckpointRow, JobRow
+from jev_agent.db import Base, CheckpointRow, ExecutionHistoryRow, JobRow
 from jev_agent.models import (
     TERMINAL_JOB_STATUSES,
     Checkpoint,
     CheckpointPhase,
+    EventType,
+    HistoryEvent,
     Job,
     JobStatus,
     StepName,
@@ -37,6 +39,17 @@ def _checkpoint_from_row(row: CheckpointRow) -> Checkpoint:
         phase=CheckpointPhase(row.phase),
         attempt=row.attempt,
         state=json.loads(row.state),
+        created_at=row.created_at,
+    )
+
+
+def _history_from_row(row: ExecutionHistoryRow) -> HistoryEvent:
+    return HistoryEvent(
+        id=row.id,
+        job_id=row.job_id,
+        attempt=row.attempt,
+        event_type=EventType(row.event_type),
+        payload=json.loads(row.payload),
         created_at=row.created_at,
     )
 
@@ -145,3 +158,34 @@ class JobStore:
                 .order_by(CheckpointRow.id.asc())
             )
             return [_checkpoint_from_row(row) for row in rows]
+
+    def append_history_event(
+        self,
+        job_id: str,
+        attempt: int,
+        event_type: EventType,
+        payload: dict[str, object],
+    ) -> HistoryEvent:
+        """Append one event to the job's execution history. Append-only: there
+        is deliberately no update or delete counterpart."""
+        row = ExecutionHistoryRow(
+            job_id=job_id,
+            attempt=attempt,
+            event_type=event_type.value,
+            payload=json.dumps(payload),
+            created_at=datetime.now(UTC),
+        )
+        with self._session_factory() as session:
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            return _history_from_row(row)
+
+    def list_history(self, job_id: str) -> list[HistoryEvent]:
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(ExecutionHistoryRow)
+                .where(ExecutionHistoryRow.job_id == job_id)
+                .order_by(ExecutionHistoryRow.id.asc())
+            )
+            return [_history_from_row(row) for row in rows]
