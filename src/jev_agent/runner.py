@@ -25,6 +25,8 @@ from jev_agent.models import (
 from jev_agent.recovery import determine_resume_step
 from jev_agent.store import JobStore
 
+ProposeFn = Callable[[Path, str], FixProposal]
+ApplyFn = Callable[[Path, FixProposal], object]
 VerifyFn = Callable[[Path], VerificationResult]
 JudgeFn = Callable[[dict[str, object]], Judgment]
 ClockFn = Callable[[], datetime]
@@ -324,6 +326,8 @@ def run_job(
     verify_fn: VerifyFn | None = None,
     judge_fn: JudgeFn | None = None,
     clock: ClockFn | None = None,
+    propose_fn: ProposeFn | None = None,
+    apply_fn: ApplyFn | None = None,
 ) -> Job:
     """Run (or resume) a job through PROPOSE -> APPLY -> VERIFY, retrying a
     failed VERIFY (bounded by the job's budget) by restarting the whole
@@ -350,6 +354,11 @@ def run_job(
     `clock` (default: real UTC now) measures elapsed wall-clock time against
     the job's budget, and is injectable for deterministic tests.
 
+    `propose_fn` and `apply_fn` default to `ase.agent.propose_fix` and
+    `ase.apply_fix.apply_fix`; they are injection seams for simulated runs
+    (the console's stories), which exercise the real governance path without
+    calling the frontier model or touching `target/fleetops`.
+
     An exceeded budget or a confident not-retryable judgment escalates the
     job to `WAITING_ON_ESCALATION`; a raising step ends it `FAILED`. Both,
     like `SUCCEEDED`, are never re-run.
@@ -364,6 +373,8 @@ def run_job(
     verify = verify_fn if verify_fn is not None else verify_repository
     judge = judge_fn if judge_fn is not None else judgment_module.judge_verify_failure
     now = clock if clock is not None else _utc_now
+    propose = propose_fn if propose_fn is not None else propose_fix
+    apply = apply_fn if apply_fn is not None else apply_fix
 
     while True:
         attempt = job.retry_count + 1
@@ -410,7 +421,7 @@ def run_job(
         if resume_step is StepName.PROPOSE:
             store.add_checkpoint(job_id, StepName.PROPOSE, CheckpointPhase.BEFORE, attempt=attempt)
             try:
-                proposal = propose_fix(repo_root, ticket)
+                proposal = propose(repo_root, ticket)
             except Exception as error:
                 return _fail_step(store, job_id, attempt, StepName.PROPOSE, error)
             store.add_checkpoint(
@@ -445,7 +456,7 @@ def run_job(
                     job_id, StepName.APPLY, CheckpointPhase.BEFORE, attempt=attempt
                 )
             try:
-                apply_fix(repo_root, proposal)
+                apply(repo_root, proposal)
             except Exception as error:
                 return _fail_step(store, job_id, attempt, StepName.APPLY, error)
             store.add_checkpoint(
