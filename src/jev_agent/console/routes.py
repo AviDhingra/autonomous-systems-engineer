@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from jev_agent.console import view_models
-from jev_agent.history_format import format_event
 from jev_agent.models import Job
 from jev_agent.store import JobStore
 
@@ -43,11 +42,8 @@ def _job_context(request: Request, job: Job) -> dict[str, object]:
         "label": view_models.status_label(job.status),
         "active": view_models.is_active(job.status),
         "budget": view_models.budget_summary(job, _now(request)),
-        "attempts": view_models.group_by_attempt(store.list_checkpoints(job.id), events),
-        "escalations": store.list_escalations(job.id),
-        "events": events,
-        "format_event": format_event,
-        "judgment_summary": view_models.judgment_summary,
+        "attempts": view_models.display_attempts(store.list_checkpoints(job.id), events),
+        "escalations": [view_models.escalation_view(e) for e in store.list_escalations(job.id)],
     }
 
 
@@ -91,8 +87,8 @@ def escalation_list(request: Request) -> HTMLResponse:
         request,
         "escalations.html",
         {
-            "pending": store.list_pending_escalations(),
-            "resolved": store.list_resolved_escalations(),
+            "pending": [view_models.escalation_view(e) for e in store.list_pending_escalations()],
+            "resolved": [view_models.escalation_view(e) for e in store.list_resolved_escalations()],
         },
     )
 

@@ -1,8 +1,35 @@
-<h2>Execution history</h2>
-<ol class="history">
-  {% for event in events %}
-  <li>{{ format_event(event) }}</li>
+<section id="job-history"
+  {%- if active %} hx-get="/jobs/{{ job.id }}/history" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <h2>Execution history</h2>
+  {% for attempt in attempts %}
+  <div class="attempt">
+    <h3>Attempt {{ attempt.attempt }}</h3>
+    {% if attempt.steps %}
+    <ul class="steps">
+      {% for step in attempt.steps %}
+      <li class="step step-{{ step.state }}">
+        <span class="step-name">{{ step.name }}</span>
+        <span class="step-state">{{ step.state }}</span>
+        <span class="step-detail">{{ step.detail }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <ol class="timeline">
+      {% for event in attempt.events %}
+      <li class="event event-{{ event.kind }}">
+        <time>{{ event.created_at.strftime("%H:%M:%S") }}</time>
+        <div class="event-body">
+          <strong>{{ event.title }}</strong>
+          {% for line in event.details %}<div class="event-detail">{{ line }}</div>{% endfor %}
+        </div>
+      </li>
+      {% else %}
+      <li class="empty">No events recorded for this attempt.</li>
+      {% endfor %}
+    </ol>
+  </div>
   {% else %}
-  <li class="empty">No history yet.</li>
+  <p class="empty">No history yet.</p>
   {% endfor %}
-</ol>
+</section>

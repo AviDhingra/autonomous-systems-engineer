@@ -80,11 +80,12 @@ def test_job_detail_shows_checkpoints_budget_escalation_and_history(
 
     assert response.status_code == 200
     assert "Attempt 1" in response.text
-    assert "propose · after" in response.text
+    assert 'step-name">propose' in response.text
     assert "1 / 1" in response.text  # retries used / max
-    assert "retry_budget_exhausted" in response.text
+    assert "Retry budget exhausted" in response.text
+    assert "boom" in response.text  # failure output behind the escalation
     assert f"/escalations/{escalation.id}/resolve" in response.text
-    assert "escalation" in response.text  # history line for the ESCALATION event
+    assert "Escalated: retry_budget_exhausted" in response.text
 
 
 def test_status_and_history_fragments(client: TestClient, store: JobStore) -> None:
@@ -107,7 +108,7 @@ def test_history_is_chronological(client: TestClient, store: JobStore) -> None:
 
     text = client.get(f"/jobs/{job.id}/history").text
 
-    assert text.index("escalation") < text.index("zzz.py")
+    assert text.index("Escalated:") < text.index("zzz.py")
 
 
 def test_pending_escalations_page(client: TestClient, store: JobStore) -> None:
@@ -121,7 +122,7 @@ def test_pending_escalations_page(client: TestClient, store: JobStore) -> None:
     pending_part, resolved_part = response.text.split("<h2>Resolved</h2>")
     assert f"#{escalation.id}" in pending_part
     assert f"#{resolved.id}" not in pending_part
-    assert "failure_output: boom" in pending_part
+    assert "boom" in pending_part
     assert f"#{resolved.id}" in resolved_part
     assert "handled it" in resolved_part
     assert f"/jobs/{job.id}" in pending_part
