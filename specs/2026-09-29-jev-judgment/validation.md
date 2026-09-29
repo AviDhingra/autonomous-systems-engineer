@@ -67,6 +67,36 @@ by the fake-judge tests. The live run's job is to prove the real SDK wiring
 works end to end. Record the actual run (date, labels/confidences seen,
 final status) in this file when done.
 
+**Actual run (2026-09-29, realistic failure text):** job
+`09f0d744-0dcc-44a3-bad8-c981b6c9daaf`, S02 with `bug.patch` injected and a forced
+VERIFY failure carrying real pytest output (`DID NOT RAISE ValueError`).
+
+| Attempt | Real JEV answer | Policy decision | Why |
+| --- | --- | --- | --- |
+| 1 | `retryable`, 0.99 | `RETRY` | Confident judgment, under the cap: followed. |
+| 2 | `not_retryable`, 0.19 | `RETRY` | Below `MIN_JUDGMENT_CONFIDENCE` (0.5): judgment ignored, fixed-rule fallback. |
+| 3 | not consulted | `FAILED` | `PROPOSE` raised `RuntimeError: Claude did not converge within 30 tool turns`, recorded as a `STEP_ERROR`. |
+
+Final status `FAILED`, `retry_count == 2` (`MAX_VERIFY_RETRIES`). Each
+`JEV_JUDGMENT` event holds the state sent, JEV's answer, and the outcome
+policy decided, and `target/fleetops` was restored to baseline afterward.
+This shows, live: a real judgment consulted and recorded on each VERIFY
+failure; a confident judgment consumed by policy; a low-confidence judgment
+overridden by the deterministic fallback; and step errors made diagnosable.
+
+Not shown live: a *confident* `not_retryable` causing an early `FAIL`. That
+path is covered by the fake-judge tests (`test_confident_not_retryable_fails_after_one_attempt`).
+Note attempt 2's `not_retryable` was arguably the right call (the same failure
+recurring), but at 0.19 confidence policy did not act on it; whether 0.5 is
+the right `MIN_JUDGMENT_CONFIDENCE` should be tuned on more data.
+
+Why attempts 2 and 3 do not behave like real retries: a retry restarts from
+`PROPOSE` on the tree the previous attempt already repaired (Milestone 2's
+decision), and the forced failure is fake, so no bug remains to find. This is
+a demo artifact, not an M3 defect. Whether a retry should first roll back the
+failed attempt's `APPLY` (`apply_fix` returns the previous file content) is
+an open design question for Milestone 4.
+
 ## Definition of done
 
 - All automated checks pass.
@@ -74,5 +104,7 @@ final status) in this file when done.
 - The manual live demo has been run at least once with a real JEV judgment
   recorded in `execution_history`, and the run is noted above.
 - `typesafe-sdk` is the only dependency added; no forbidden frameworks.
-- No changes to `src/ase/`, `target/fleetops/`, or `scenarios/S01-*`.
+- No changes to `src/ase/`, `target/fleetops/`, or `scenarios/S01-*`, other than
+  the approved `MAX_TOKENS` / `MAX_TOOL_TURNS` edits in `src/ase/agent.py` (see
+  `requirements.md`).
 - `specs/roadmap.md` Milestone 3 is marked complete.

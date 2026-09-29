@@ -82,7 +82,11 @@ a JEV failure must never crash or fail a job.
 A new `execution_history` table (SQLAlchemy model in `db.py`, methods in
 `store.py`), append-only, created now so Milestone 4 extends rather than
 migrates it. Columns: id, job id, attempt, event type, JSON payload,
-timestamp. Milestone 3 writes exactly one event type, `JEV_JUDGMENT`, whose
+timestamp. Milestone 3 writes two event types. `STEP_ERROR` (added after the first live
+demo, where a swallowed `PROPOSE` exception made a failed job undiagnosable)
+records step, error type, message, and truncated traceback whenever
+`PROPOSE`/`APPLY`/`VERIFY` raises, before the job is marked `FAILED`.
+`JEV_JUDGMENT`'s
 payload holds the judgment input (the state sent), its output (label,
 confidence, or the error if unavailable), and the `StepOutcome` policy
 decided. Transitions, retries, and escalations are **not** logged yet
@@ -95,6 +99,24 @@ decided. Transitions, retries, and escalations are **not** logged yet
 - Logging transitions/retries in `execution_history` (Milestone 4).
 - Additional JEV judgment points, or JEV on `PROPOSE`/`APPLY` failures.
 - Console (Milestone 5).
-- Any change to `src/ase/`, `target/fleetops/`, or `scenarios/S01-*`.
+- Any change to `src/ase/`, `target/fleetops/`, or `scenarios/S01-*`, except the
+  approved exception below.
 - Removing unused `langgraph`/`langchain-*` dependencies (separate cleanup).
   Adding `typesafe-sdk` to `pyproject.toml` is the only dependency change.
+
+## Approved exceptions to "Project 1 is untouched"
+
+`ase/agent.py`'s `MAX_TOKENS` was raised from 4096 to 16000 with the
+user's explicit approval. The first live demos repeatedly failed `PROPOSE`
+with `stop_reason == "max_tokens"` (surfaced by `STEP_ERROR` history events),
+even though the fix file is ~500 tokens. 
+
+A second approved edit added `MAX_TOOL_TURNS = 30` to `propose_fix`, which
+raises `RuntimeError` when exceeded. The live demo ran an unbounded
+investigation (over 100 tool calls, several euros) because the committed
+FleetOps baseline is already the *fixed* code and the demos never applied the
+scenario's `bug.patch`, so there was nothing to find. The turn cap is a cost
+guard; the root-cause fix is `jev_agent/scenario.py`'s `injected_bug`, which
+both demos now use to apply `bug.patch` before the run and restore
+`target/fleetops` to baseline afterward (refusing to start if that tree is
+dirty).
