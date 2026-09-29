@@ -64,37 +64,63 @@ real JEV call). `ANTHROPIC_API_KEY` is not needed.
 python -m jev_agent.console --database-url sqlite:///./demo_console.db
 ```
 
-- [ ] A JEV judgment on a simulated run comes from the live API (real
-      classification and confidence in history), and policy's outcome
-      follows from it.
-- [ ] If JEV's answer differs from a story's typical path, the job page
-      still makes clear what JEV said and what policy decided.
-- [ ] With `TYPESAFE_API_KEY` unset, the banner shows and runs fall back to
-      the fixed rule.
+Walkthrough run 2026-09-29 in Chrome against a fresh database, live JEV.
 
-- [ ] Landing on `/`, the pitch and the "How it works" link explain the
+- [x] A JEV judgment on a simulated run comes from the live API (real
+      classification and confidence in history), and policy's outcome
+      follows from it. (retry-then-pass: retryable 99% → retry.)
+- [x] If JEV's answer differs from a story's typical path, the job page
+      still makes clear what JEV said and what policy decided. (jev-stop:
+      see "Findings" below.)
+- [x] With `TYPESAFE_API_KEY` unset, the banner shows and runs fall back to
+      the fixed rule. (Checked with the headless preview before the key
+      was added.)
+
+- [x] Landing on `/`, the pitch and the "How it works" link explain the
       purpose in one screen; stat tiles and recent jobs are populated after
       running a story.
-- [ ] "How it works" diagram shows who proposes, who judges, and who
+- [x] "How it works" diagram shows who proposes, who judges, and who
       decides, readable without zooming.
-- [ ] Every story can be started from the UI; the stepper animates
+- [x] Every story can be started from the UI; the stepper animates
       Propose → Apply → Verify live; the JEV decision appears immediately.
-- [ ] retry-then-pass shows the decision node (JEV retryable → policy
+      (Header dialog and a story card clicked in Chrome; the other stories
+      started with the same form POST.)
+- [x] retry-then-pass shows the decision node (JEV retryable → policy
       retry), the rollback, and a passing second attempt.
-- [ ] crash-resume stops as **Interrupted**; **Resume** continues at
+- [x] crash-resume stops as **Interrupted**; **Resume** continues at
       Verify without re-running Propose or Apply.
-- [ ] Budget and jev-stop stories end with an escalation card; resolving it
+- [x] Budget and jev-stop stories end with an escalation card; resolving it
       shows a toast and the resolved state; the job stays waiting.
-- [ ] Starting a second story while one runs shows a clear "one at a time"
-      message.
-- [ ] The tour walks through all patterns and each "Run this story" works.
-- [ ] Jobs filters (status, simulated/real) and id search work.
-- [ ] Stopping the console mid-run and restarting shows that job as
-      Interrupted with Resume available.
-- [ ] Layout works at phone width; controls are keyboard-reachable.
-- [ ] With the CDNs blocked, every page still renders and links work.
+- [x] Starting a second story while one runs shows a clear "one at a time"
+      message. (409 with "Only one runs at a time"; buttons disabled.)
+- [x] The tour walks through all patterns and each "Run this story" works.
+- [x] Jobs filters (status, simulated/real) and id search work. (Route
+      tests; filters auto-submit in the browser.)
+- [x] Stopping the console mid-run and restarting shows that job as
+      Interrupted with Resume available. (Resumed to Succeeded.)
+- [x] Layout works at phone width: no horizontal overflow on any page at
+      390px (measured in Chrome).
+- [ ] Controls are keyboard-reachable: all controls are native links,
+      buttons, inputs and a native `<dialog>`, with visible focus styles,
+      but a full keyboard-only pass has not been done.
+- [x] With the CDNs blocked, every page still renders and links work.
+      (Pages loaded with the htmx/Alpine scripts stripped: styles, all
+      story forms, all six tour steps and the stepper still show; "Run a
+      scenario" falls back to `/#run`.)
 - [ ] **First-time viewer check:** someone who has not seen the project
-      explains its purpose back after five minutes with it.
+      explains its purpose back after five minutes with it. (For the user.)
+
+### Findings
+
+- **jev-stop does not reliably stop on JEV.** With the live API, JEV judged
+  the broken-environment failure *retryable* (92%) on attempt 1, then
+  *not retryable* at 16% and 51%. Policy retried until the retry budget ran
+  out, so the job escalated as `retry_budget_exhausted`, not
+  `jev_not_retryable`. The page explains every step correctly, but the
+  story's title promises something the live JEV didn't do. See
+  `screenshots/job-jev-stop.png`.
+- Budget stories behave as designed: the wall-clock story escalated with
+  JEV at "retryable 99%", showing budget overriding JEV.
 
 ## Evidence committed
 
@@ -102,6 +128,11 @@ Under `specs/2026-09-29-console-experience/screenshots/`: overview,
 how-it-works, a job mid-run, retry-then-pass stepper with decision node,
 interrupted crash-resume job, escalation card, tour, and a short GIF of a
 story running live.
+
+Committed: `overview.png`, `how-it-works.png`, `tour.png`,
+`job-running.png`, `job-retry-decision.png`, `job-interrupted.png`,
+`job-jev-stop.png`, `job-wall-clock.png`, `escalations.png`,
+`console-live-retry-then-pass.gif`.
 
 ## Ready to merge when
 
