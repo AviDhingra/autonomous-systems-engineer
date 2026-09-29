@@ -282,3 +282,79 @@ def test_outdated_schema_fails_with_a_clear_message(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match=r"outdated schema.*'jobs'.*max_retries"):
         JobStore(f"sqlite:///{db_path}")
+
+
+def _escalated(store: JobStore, scenario: str = "S02-unsupported-patch-fields"):  # type: ignore[no-untyped-def]
+    job = store.create_job(scenario)
+    escalation = store.escalate(job.id, 2, EscalationReason.RETRY_BUDGET_EXHAUSTED, {"k": 1})
+    return job, escalation
+
+
+def test_list_jobs_newest_first(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    first = store.create_job("a")
+    second = store.create_job("b")
+
+    assert [job.id for job in store.list_jobs()] == [second.id, first.id]
+
+
+def test_list_pending_escalations_excludes_resolved(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    _, first = _escalated(store, "a")
+    _, second = _escalated(store, "b")
+
+    store.resolve_escalation(first.id)
+
+    assert [e.id for e in store.list_pending_escalations()] == [second.id]
+
+
+def test_resolve_escalation_records_row_and_event(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    job, escalation = _escalated(store)
+
+    resolved = store.resolve_escalation(escalation.id, "looked at it")
+
+    assert resolved.resolution_state is ResolutionState.RESOLVED
+    assert resolved.resolved_at is not None
+    assert resolved.resolution_note == "looked at it"
+    reloaded = store.get_escalation(escalation.id)
+    assert reloaded is not None
+    assert reloaded.resolution_state is ResolutionState.RESOLVED
+    assert reloaded.resolved_at is not None
+    assert reloaded.resolution_note == "looked at it"
+    events = [
+        e for e in store.list_history(job.id) if e.event_type is EventType.ESCALATION_RESOLVED
+    ]
+    assert len(events) == 1
+    assert events[0].payload == {"escalation_id": escalation.id, "note": "looked at it"}
+
+
+def test_resolve_escalation_leaves_job_status(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    job, escalation = _escalated(store)
+
+    store.resolve_escalation(escalation.id)
+
+    assert store.get_job(job.id).status is JobStatus.WAITING_ON_ESCALATION  # type: ignore[union-attr]
+
+
+def test_resolve_escalation_twice_adds_one_event(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    job, escalation = _escalated(store)
+
+    store.resolve_escalation(escalation.id, "first")
+    again = store.resolve_escalation(escalation.id, "second")
+
+    assert again.resolution_note == "first"
+    resolved_events = [
+        e for e in store.list_history(job.id) if e.event_type is EventType.ESCALATION_RESOLVED
+    ]
+    assert len(resolved_events) == 1
+
+
+def test_resolve_unknown_escalation_raises(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+
+    with pytest.raises(KeyError):
+        store.resolve_escalation(999)
+    assert store.get_escalation(999) is None

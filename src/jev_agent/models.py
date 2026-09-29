@@ -92,6 +92,7 @@ class EventType(StrEnum):
     RETRY = "retry"
     ROLLBACK = "rollback"
     ESCALATION = "escalation"
+    ESCALATION_RESOLVED = "escalation_resolved"
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,3 +126,4 @@ class Escalation:
     created_at: datetime
     resolution_state: ResolutionState = ResolutionState.PENDING
     resolved_at: datetime | None = None
+    resolution_note: str | None = None
