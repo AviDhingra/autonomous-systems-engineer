@@ -55,3 +55,4 @@ class EscalationRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     resolution_state: Mapped[str] = mapped_column(String(10))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)

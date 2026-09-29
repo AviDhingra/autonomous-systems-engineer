@@ -21,6 +21,11 @@ def format_event(event: HistoryEvent) -> str:
             detail = f"restored {payload['file_path']}"
         case EventType.ESCALATION:
             detail = f"reason={payload['reason']}"
+        case EventType.ESCALATION_RESOLVED:
+            note = payload.get("note")
+            detail = f"escalation {payload['escalation_id']} resolved" + (
+                f" ({note})" if note else ""
+            )
         case EventType.STEP_ERROR:
             detail = f"{payload['step']} raised {payload['error_type']}: {payload['message']}"
     return f"- attempt {event.attempt} {event.event_type.value}: {detail}"

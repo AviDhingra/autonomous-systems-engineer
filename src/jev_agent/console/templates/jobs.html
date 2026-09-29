@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge %}
+{% block title %}Jobs{% endblock %}
+{% block content %}
+<h1>Jobs</h1>
+<p class="lede">Each job is one governed run of the repair pipeline: propose, apply, verify.</p>
+{% if rows %}
+<table class="jobs">
+  <thead>
+    <tr><th>Job</th><th>Scenario</th><th>Status</th><th>Retries</th><th>Elapsed</th><th>Created (UTC)</th></tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td><a href="/jobs/{{ row.job.id }}"><code>{{ row.job.id[:8] }}</code></a></td>
+      <td>{{ row.job.scenario }}</td>
+      <td>{{ badge(row.badge, row.label) }}</td>
+      <td>{{ row.job.retry_count }} / {{ row.job.budget.max_retries }}</td>
+      <td>{{ row.elapsed }}</td>
+      <td>{{ row.job.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No jobs yet. Seed a demo database with <code>python -m jev_agent.demo_console_seed</code>.</p>
+{% endif %}
+{% endblock %}

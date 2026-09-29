@@ -24,7 +24,8 @@ def test_every_event_type_renders_one_line(tmp_path: Path) -> None:
     store.append_history_event(job.id, 1, EventType.ROLLBACK, {"file_path": "f.py"})
     store.transition(job.id, JobStatus.RUNNING, 1, "attempt started")
     store.increment_retry_count(job.id, reason="why")
-    store.escalate(job.id, 2, EscalationReason.RETRY_BUDGET_EXHAUSTED, _context())
+    escalation = store.escalate(job.id, 2, EscalationReason.RETRY_BUDGET_EXHAUSTED, _context())
+    store.resolve_escalation(escalation.id)
 
     events = store.list_history(job.id)
     assert {e.event_type for e in events} == set(EventType)
@@ -54,3 +55,17 @@ def _context() -> dict[str, object]:
         "judgment": None,
         "failure_output": "boom",
     }
+
+
+def test_format_event_escalation_resolved(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'format_resolved_test.db'}")
+    job = store.create_job("S02-unsupported-patch-fields")
+    escalation = store.escalate(job.id, 1, EscalationReason.RETRY_BUDGET_EXHAUSTED, _context())
+    store.resolve_escalation(escalation.id, "checked")
+
+    event = store.list_history(job.id)[-1]
+
+    assert event.event_type is EventType.ESCALATION_RESOLVED
+    assert format_event(event) == (
+        f"- attempt 1 escalation_resolved: escalation {escalation.id} resolved (checked)"
+    )

@@ -1,0 +1,37 @@
+{% macro badge(css, label) -%}
+<span class="badge {{ css }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro escalation_card(view, show_job=False) -%}
+{% set e = view.escalation %}
+<article class="card escalation {{ 'is-resolved' if view.resolved else 'is-pending' }}">
+  <header class="card-head">
+    <h3>#{{ e.id }} · {{ view.reason_label }}</h3>
+    <span class="badge {{ 'badge-succeeded' if view.resolved else 'badge-escalated' }}">
+      {{ 'Resolved' if view.resolved else 'Pending' }}
+    </span>
+  </header>
+  <dl class="facts">
+    {% if show_job %}<dt>Job</dt><dd><a href="/jobs/{{ e.job_id }}">{{ e.job_id[:8] }}</a></dd>{% endif %}
+    <dt>Attempt</dt><dd>{{ e.attempt }}</dd>
+    <dt>Retries used</dt><dd>{{ view.retries }}</dd>
+    <dt>Time used</dt><dd>{{ view.elapsed }}</dd>
+    <dt>JEV judgment</dt><dd>{{ view.judgment }}</dd>
+    <dt>Raised</dt><dd>{{ e.created_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</dd>
+  </dl>
+  {% if view.failure_output %}
+  <details>
+    <summary>Failure output that triggered this</summary>
+    <pre>{{ view.failure_output }}</pre>
+  </details>
+  {% endif %}
+  {% if view.resolved %}
+  <p class="resolution">Resolved {{ e.resolved_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC{% if e.resolution_note %}: “{{ e.resolution_note }}”{% endif %}</p>
+  {% else %}
+  <form method="post" action="/escalations/{{ e.id }}/resolve" class="resolve">
+    <input type="text" name="note" placeholder="Optional note" aria-label="Resolution note">
+    <button type="submit">Mark resolved</button>
+  </form>
+  {% endif %}
+</article>
+{%- endmacro %}

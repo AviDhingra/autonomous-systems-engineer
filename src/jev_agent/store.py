@@ -73,6 +73,7 @@ def _escalation_from_row(row: EscalationRow) -> Escalation:
         created_at=row.created_at,
         resolution_state=ResolutionState(row.resolution_state),
         resolved_at=row.resolved_at,
+        resolution_note=row.resolution_note,
     )
 
 
@@ -147,6 +148,12 @@ class JobStore:
             session.add(row)
             session.commit()
         return _job_from_row(row)
+
+    def list_jobs(self) -> list[Job]:
+        """All jobs, newest first."""
+        with self._session_factory() as session:
+            rows = session.scalars(select(JobRow).order_by(JobRow.created_at.desc()))
+            return [_job_from_row(row) for row in rows]
 
     def get_job(self, job_id: str) -> Job | None:
         with self._session_factory() as session:
@@ -291,6 +298,59 @@ class JobStore:
                 .order_by(EscalationRow.id.asc())
             )
             return [_escalation_from_row(row) for row in rows]
+
+    def list_pending_escalations(self) -> list[Escalation]:
+        """Unresolved escalations across all jobs, oldest first."""
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(EscalationRow)
+                .where(EscalationRow.resolution_state == ResolutionState.PENDING.value)
+                .order_by(EscalationRow.id.asc())
+            )
+            return [_escalation_from_row(row) for row in rows]
+
+    def list_resolved_escalations(self) -> list[Escalation]:
+        """Resolved escalations across all jobs, most recently resolved first."""
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(EscalationRow)
+                .where(EscalationRow.resolution_state == ResolutionState.RESOLVED.value)
+                .order_by(EscalationRow.resolved_at.desc(), EscalationRow.id.desc())
+            )
+            return [_escalation_from_row(row) for row in rows]
+
+    def get_escalation(self, escalation_id: int) -> Escalation | None:
+        with self._session_factory() as session:
+            row = session.get(EscalationRow, escalation_id)
+            if row is None:
+                return None
+            return _escalation_from_row(row)
+
+    def resolve_escalation(self, escalation_id: int, note: str = "") -> Escalation:
+        """Mark an escalation resolved and record it in history, in one transaction.
+
+        Record-only: the job stays `WAITING_ON_ESCALATION`. Resolving an
+        already-resolved escalation is a no-op (no second event)."""
+        with self._session_factory() as session:
+            row = session.get(EscalationRow, escalation_id)
+            if row is None:
+                raise KeyError(escalation_id)
+            if row.resolution_state == ResolutionState.RESOLVED.value:
+                return _escalation_from_row(row)
+            now = datetime.now(UTC)
+            row.resolution_state = ResolutionState.RESOLVED.value
+            row.resolved_at = now
+            row.resolution_note = note or None
+            session.add(
+                _history_row(
+                    row.job_id,
+                    row.attempt,
+                    EventType.ESCALATION_RESOLVED,
+                    {"escalation_id": escalation_id, "note": note},
+                )
+            )
+            session.commit()
+            return _escalation_from_row(row)
 
     def add_checkpoint(
         self,

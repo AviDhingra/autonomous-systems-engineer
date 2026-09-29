@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_macros.html" import escalation_card %}
+{% block title %}Escalations{% endblock %}
+{% block content %}
+<h1>Escalations</h1>
+<p class="lede">Jobs that stopped making automated progress and are waiting for a person.</p>
+
+<section>
+  <h2>Pending</h2>
+  {% for view in pending %}
+  {{ escalation_card(view, show_job=True) }}
+  {% else %}
+  <p class="empty">No pending escalations.</p>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Resolved</h2>
+  {% for view in resolved %}
+  {{ escalation_card(view, show_job=True) }}
+  {% else %}
+  <p class="empty">Nothing resolved yet.</p>
+  {% endfor %}
+</section>
+{% endblock %}
