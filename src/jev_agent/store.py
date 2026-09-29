@@ -309,6 +309,16 @@ class JobStore:
             )
             return [_escalation_from_row(row) for row in rows]
 
+    def list_resolved_escalations(self) -> list[Escalation]:
+        """Resolved escalations across all jobs, most recently resolved first."""
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(EscalationRow)
+                .where(EscalationRow.resolution_state == ResolutionState.RESOLVED.value)
+                .order_by(EscalationRow.resolved_at.desc(), EscalationRow.id.desc())
+            )
+            return [_escalation_from_row(row) for row in rows]
+
     def get_escalation(self, escalation_id: int) -> Escalation | None:
         with self._session_factory() as session:
             row = session.get(EscalationRow, escalation_id)

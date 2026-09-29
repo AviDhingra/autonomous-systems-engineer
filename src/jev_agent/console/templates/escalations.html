@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Escalations{% endblock %}
+{% block content %}
+<h1>Escalations</h1>
+
+<section>
+  <h2>Pending</h2>
+  {% for escalation in pending %}
+  <div class="escalation">
+    <p>#{{ escalation.id }} · <a href="/jobs/{{ escalation.job_id }}">job {{ escalation.job_id[:8] }}</a> ·
+       {{ escalation.reason.value }} · attempt {{ escalation.attempt }}</p>
+    <ul>
+      {% for key, value in escalation.context.items() %}
+      <li>{{ key }}: {{ value }}</li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="/escalations/{{ escalation.id }}/resolve">
+      <input type="text" name="note" placeholder="Optional note">
+      <button type="submit">Resolve</button>
+    </form>
+  </div>
+  {% else %}
+  <p class="empty">No pending escalations.</p>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Resolved</h2>
+  {% for escalation in resolved %}
+  <p>#{{ escalation.id }} · <a href="/jobs/{{ escalation.job_id }}">job {{ escalation.job_id[:8] }}</a> ·
+     {{ escalation.reason.value }}{% if escalation.resolution_note %} · {{ escalation.resolution_note }}{% endif %}</p>
+  {% else %}
+  <p class="empty">Nothing resolved yet.</p>
+  {% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,8 @@
+<h2>Execution history</h2>
+<ol class="history">
+  {% for event in events %}
+  <li>{{ format_event(event) }}</li>
+  {% else %}
+  <li class="empty">No history yet.</li>
+  {% endfor %}
+</ol>

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.id[:8] }}{% endblock %}
+{% block content %}
+<h1>Job {{ job.id[:8] }} <span class="scenario">{{ job.scenario }}</span></h1>
+
+<section id="job-status">
+  {% include "fragments/status.html" %}
+</section>
+
+<section>
+  <h2>Checkpoints</h2>
+  {% for attempt in attempts %}
+  <h3>Attempt {{ attempt.attempt }}</h3>
+  <ul>
+    {% for checkpoint in attempt.checkpoints %}
+    <li>{{ checkpoint.step.value }} · {{ checkpoint.phase.value }}</li>
+    {% else %}
+    <li class="empty">No checkpoints.</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No checkpoints yet.</p>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Escalations</h2>
+  {% for escalation in escalations %}
+  <div class="escalation">
+    <p>#{{ escalation.id }} · {{ escalation.reason.value }} · attempt {{ escalation.attempt }} ·
+       {{ escalation.resolution_state.value }}</p>
+    {% if escalation.resolution_note %}<p>Note: {{ escalation.resolution_note }}</p>{% endif %}
+    {% if escalation.resolution_state.value == "pending" %}
+    <form method="post" action="/escalations/{{ escalation.id }}/resolve">
+      <input type="text" name="note" placeholder="Optional note">
+      <button type="submit">Resolve</button>
+    </form>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="empty">No escalations.</p>
+  {% endfor %}
+</section>
+
+<section id="job-history">
+  {% include "fragments/history.html" %}
+</section>
+{% endblock %}
