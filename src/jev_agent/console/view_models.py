@@ -124,7 +124,8 @@ def judgment_summary(event: HistoryEvent) -> JudgmentSummary | None:
     if event.event_type is not EventType.JEV_JUDGMENT:
         return None
     output = event.payload.get("output")
-    if not isinstance(output, dict):
+    # A judge that raised is recorded as {"error": ...}: not a judgment.
+    if not isinstance(output, dict) or "retryability" not in output:
         return None
     return JudgmentSummary(
         retryability=str(output.get("retryability", "unknown")),
@@ -240,6 +241,9 @@ def event_view(event: HistoryEvent) -> EventView:
             if summary is None:
                 title = "JEV judgment unavailable; fell back to fixed policy"
                 details = [f"policy outcome: {_text(payload.get('outcome'))}"]
+                output = payload.get("output")
+                if isinstance(output, dict) and output.get("error"):
+                    details.insert(0, _text(output["error"]))
             else:
                 title = f"JEV judged the failure {summary.retryability.replace('_', ' ')}"
                 details = [

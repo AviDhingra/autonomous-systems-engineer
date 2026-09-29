@@ -245,3 +245,16 @@ def test_escalation_view_readable_facts() -> None:
     assert view.judgment == "none consulted"
     assert view.failure_output == "boom"
     assert not view.resolved
+
+
+def test_judge_error_event_is_not_shown_as_a_judgment() -> None:
+    view = event_view(
+        _event(
+            EventType.JEV_JUDGMENT,
+            {"input": {}, "output": {"error": "RuntimeError: JEV unavailable"}, "outcome": "retry"},
+        )
+    )
+
+    assert view.judgment is None
+    assert view.title.startswith("JEV judgment unavailable")
+    assert "RuntimeError: JEV unavailable" in view.details
