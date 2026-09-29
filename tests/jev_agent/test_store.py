@@ -1,6 +1,15 @@
 from pathlib import Path
 
-from jev_agent.models import CheckpointPhase, EventType, JobStatus, StepName
+import pytest
+
+from jev_agent.models import (
+    CheckpointPhase,
+    EscalationReason,
+    EventType,
+    JobStatus,
+    ResolutionState,
+    StepName,
+)
 from jev_agent.store import JobStore
 
 
@@ -134,3 +143,142 @@ def test_history_is_scoped_per_job(tmp_path: Path) -> None:
 
     assert store.list_history(b.id) == []
     assert [e.payload for e in store.list_history(a.id)] == [{"job": "a"}]
+
+
+# --- Milestone 4: budgets, atomic transitions, escalations ---
+
+
+def test_budget_round_trips_and_defaults(tmp_path: Path) -> None:
+    from jev_agent.models import DEFAULT_BUDGET, Budget
+
+    store = JobStore(f"sqlite:///{tmp_path / 'budget_test.db'}")
+    custom = Budget(max_retries=5, max_wall_clock_seconds=42.5)
+
+    assert store.create_job("S02").budget == DEFAULT_BUDGET
+    job = store.create_job("S02", budget=custom)
+    fetched = store.get_job(job.id)
+    assert fetched is not None and fetched.budget == custom
+
+
+def test_transition_updates_status_and_records_one_event(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'transition_test.db'}")
+    job = store.create_job("S02")
+
+    updated = store.transition(job.id, JobStatus.RUNNING, 1, "attempt started")
+
+    assert updated.status is JobStatus.RUNNING
+    (event,) = store.list_history(job.id)
+    assert event.event_type is EventType.STATUS_TRANSITION
+    assert event.payload == {"from": "pending", "to": "running", "reason": "attempt started"}
+
+
+def test_transition_to_the_same_status_is_a_no_op(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'noop_test.db'}")
+    job = store.create_job("S02")
+    store.transition(job.id, JobStatus.RUNNING, 1, "attempt started")
+
+    store.transition(job.id, JobStatus.RUNNING, 1, "attempt started again")
+
+    assert len(store.list_history(job.id)) == 1
+
+
+def test_transition_and_its_event_are_atomic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from jev_agent import store as store_module
+
+    store = JobStore(f"sqlite:///{tmp_path / 'atomic_test.db'}")
+    job = store.create_job("S02")
+
+    def _boom(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("history write failed")
+
+    monkeypatch.setattr(store_module, "_history_row", _boom)
+    with pytest.raises(RuntimeError):
+        store.transition(job.id, JobStatus.RUNNING, 1, "attempt started")
+
+    fetched = store.get_job(job.id)
+    assert fetched is not None and fetched.status is JobStatus.PENDING
+
+
+def test_increment_retry_count_records_a_retry_event(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'retry_event_test.db'}")
+    job = store.create_job("S02")
+
+    updated = store.increment_retry_count(job.id, reason="verify failed")
+
+    assert updated.retry_count == 1
+    (event,) = store.list_history(job.id)
+    assert event.event_type is EventType.RETRY
+    assert event.attempt == 1
+    assert event.payload["to_attempt"] == 2
+
+
+def test_escalate_writes_record_status_and_events_together(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'escalate_test.db'}")
+    job = store.create_job("S02")
+
+    escalation = store.escalate(
+        job.id, 2, EscalationReason.WALL_CLOCK_EXCEEDED, {"elapsed_seconds": 9.0}
+    )
+
+    assert escalation.reason is EscalationReason.WALL_CLOCK_EXCEEDED
+    assert escalation.resolution_state is ResolutionState.PENDING
+    assert escalation.resolved_at is None
+    assert escalation.context == {"elapsed_seconds": 9.0}
+    assert store.list_escalations(job.id) == [escalation]
+    fetched = store.get_job(job.id)
+    assert fetched is not None and fetched.status is JobStatus.WAITING_ON_ESCALATION
+    types = [e.event_type for e in store.list_history(job.id)]
+    assert types == [EventType.STATUS_TRANSITION, EventType.ESCALATION]
+
+
+def test_escalate_is_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from jev_agent import store as store_module
+
+    store = JobStore(f"sqlite:///{tmp_path / 'escalate_atomic_test.db'}")
+    job = store.create_job("S02")
+
+    def _boom(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("history write failed")
+
+    monkeypatch.setattr(store_module, "_history_row", _boom)
+    with pytest.raises(RuntimeError):
+        store.escalate(job.id, 1, EscalationReason.RETRY_BUDGET_EXHAUSTED, {})
+
+    fetched = store.get_job(job.id)
+    assert fetched is not None and fetched.status is JobStatus.PENDING
+    assert store.list_escalations(job.id) == []
+
+
+def test_find_active_job_ignores_jobs_waiting_on_escalation(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'waiting_test.db'}")
+    job = store.create_job("S02")
+    store.escalate(job.id, 1, EscalationReason.JEV_NOT_RETRYABLE, {})
+
+    assert store.find_active_job("S02") is None
+
+
+def test_append_history_event_once_skips_a_duplicate_per_attempt(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'once_test.db'}")
+    job = store.create_job("S02")
+
+    first = store.append_history_event_once(job.id, 1, EventType.ROLLBACK, {"n": 1})
+    duplicate = store.append_history_event_once(job.id, 1, EventType.ROLLBACK, {"n": 2})
+    other_attempt = store.append_history_event_once(job.id, 2, EventType.ROLLBACK, {"n": 3})
+
+    assert first is not None and duplicate is None and other_attempt is not None
+    assert len(store.list_history(job.id)) == 2
+
+
+def test_outdated_schema_fails_with_a_clear_message(tmp_path: Path) -> None:
+    import sqlite3
+
+    db_path = tmp_path / "old_schema.db"
+    connection = sqlite3.connect(db_path)
+    connection.execute("CREATE TABLE jobs (id VARCHAR(36) PRIMARY KEY, scenario VARCHAR(200))")
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(RuntimeError, match=r"outdated schema.*'jobs'.*max_retries"):
+        JobStore(f"sqlite:///{db_path}")

@@ -3,9 +3,15 @@ from pathlib import Path
 import pytest
 
 from ase.verify import CheckResult, VerificationResult
-from jev_agent import policy
 from jev_agent import runner as runner_module
-from jev_agent.models import Checkpoint, CheckpointPhase, Job, JobStatus, StepName
+from jev_agent.models import (
+    DEFAULT_MAX_RETRIES,
+    Checkpoint,
+    CheckpointPhase,
+    Job,
+    JobStatus,
+    StepName,
+)
 from jev_agent.recovery import determine_resume_step
 from jev_agent.runner import run_job
 from jev_agent.store import JobStore
@@ -139,7 +145,7 @@ def test_resuming_after_apply_skips_propose_and_apply(
     ]
 
 
-def test_resuming_after_apply_fails_job_if_verify_fails_and_retries_are_exhausted(
+def test_resuming_after_apply_escalates_job_if_verify_fails_and_retries_are_exhausted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A VERIFY failure doesn't fail the job outright anymore (Milestone 2:
@@ -147,8 +153,8 @@ def test_resuming_after_apply_fails_job_if_verify_fails_and_retries_are_exhauste
     the retry cap so this resume still exercises the Milestone 1 guarantee:
     resuming after APPLY never re-proposes or re-applies."""
     store = _store(tmp_path)
-    job = _seed_job_interrupted_after_apply(store, attempt=policy.MAX_VERIFY_RETRIES + 1)
-    for _ in range(policy.MAX_VERIFY_RETRIES):
+    job = _seed_job_interrupted_after_apply(store, attempt=DEFAULT_MAX_RETRIES + 1)
+    for _ in range(DEFAULT_MAX_RETRIES):
         store.increment_retry_count(job.id)
 
     def _fail_if_called(*args: object, **kwargs: object) -> object:
@@ -164,6 +170,15 @@ def test_resuming_after_apply_fails_job_if_verify_fails_and_retries_are_exhauste
     monkeypatch.setattr(runner_module, "apply_fix", _fail_if_called)
     monkeypatch.setattr(runner_module, "verify_repository", lambda repo_root: failing_result)
 
-    result = run_job(store, tmp_path, ticket="unused", job_id=job.id)
+    def _no_judgment(state: dict[str, object]) -> object:
+        raise RuntimeError("no JEV in this test")
 
-    assert result.status is JobStatus.FAILED
+    result = run_job(
+        store,
+        tmp_path,
+        ticket="unused",
+        job_id=job.id,
+        judge_fn=_no_judgment,  # type: ignore[arg-type]
+    )
+
+    assert result.status is JobStatus.WAITING_ON_ESCALATION
