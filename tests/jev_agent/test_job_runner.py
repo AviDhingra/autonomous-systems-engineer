@@ -7,7 +7,17 @@ from ase.models import FixProposal
 from ase.verify import CheckResult, VerificationResult
 from jev_agent import policy
 from jev_agent import runner as runner_module
-from jev_agent.models import CheckpointPhase, EventType, JobStatus, Judgment, Retryability, StepName
+from jev_agent.models import (
+    DEFAULT_MAX_RETRIES,
+    CheckpointPhase,
+    EscalationReason,
+    EventType,
+    HistoryEvent,
+    JobStatus,
+    Judgment,
+    Retryability,
+    StepName,
+)
 from jev_agent.runner import run_job
 from jev_agent.store import JobStore
 
@@ -16,6 +26,10 @@ SCENARIO = "S02-unsupported-patch-fields"
 
 def _store(tmp_path: Path) -> JobStore:
     return JobStore(f"sqlite:///{tmp_path / 'job_runner_test.db'}")
+
+
+def _events(store: JobStore, job_id: str, event_type: EventType) -> list[HistoryEvent]:
+    return [e for e in store.list_history(job_id) if e.event_type is event_type]
 
 
 def _judge_returning(
@@ -100,7 +114,7 @@ def test_job_run_fails_without_retry_when_propose_raises(
     ]
     assert not any(c.step is StepName.APPLY for c in checkpoints)
 
-    (event,) = store.list_history(job.id)
+    (event,) = _events(store, job.id, EventType.STEP_ERROR)
     assert event.event_type is EventType.STEP_ERROR
     assert event.attempt == 1
     assert event.payload["step"] == "propose"
@@ -153,7 +167,7 @@ def _propose_with_attempt_marker() -> tuple[list[str], Callable[[Path, str], Fix
     return calls, _propose
 
 
-def test_verify_that_always_fails_ends_failed_after_bounded_retries(
+def test_verify_that_always_fails_escalates_after_bounded_retries(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     store = _store(tmp_path)
@@ -178,9 +192,9 @@ def test_verify_that_always_fails_ends_failed_after_bounded_retries(
         judge_fn=_judge_returning(Retryability.RETRYABLE, 0.9),
     )
 
-    total_attempts = policy.MAX_VERIFY_RETRIES + 1
-    assert result.status is JobStatus.FAILED
-    assert result.retry_count == policy.MAX_VERIFY_RETRIES
+    total_attempts = DEFAULT_MAX_RETRIES + 1
+    assert result.status is JobStatus.WAITING_ON_ESCALATION
+    assert result.retry_count == DEFAULT_MAX_RETRIES
     assert len(propose_calls) == total_attempts
     assert len(apply_calls) == total_attempts
 
@@ -342,11 +356,11 @@ def _run_failing(
         verify_fn=lambda repo_root: _failing_verification(),
         judge_fn=judge_fn,
     )
-    assert result.status is JobStatus.FAILED
+    assert result.status is JobStatus.WAITING_ON_ESCALATION
     return store, job.id
 
 
-def test_confident_not_retryable_fails_after_one_attempt(
+def test_confident_not_retryable_escalates_after_one_attempt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     propose_calls, _ = _wire_pipeline(monkeypatch)
@@ -356,9 +370,11 @@ def test_confident_not_retryable_fails_after_one_attempt(
     assert len(propose_calls) == 1
     job = store.get_job(job_id)
     assert job is not None and job.retry_count == 0
-    history = store.list_history(job_id)
+    history = _events(store, job_id, EventType.JEV_JUDGMENT)
     assert len(history) == 1
-    assert history[0].payload["outcome"] == policy.StepOutcome.FAIL.value
+    assert history[0].payload["outcome"] == policy.StepOutcome.ESCALATE.value
+    (escalation,) = store.list_escalations(job_id)
+    assert escalation.reason is EscalationReason.JEV_NOT_RETRYABLE
 
 
 def test_confident_retryable_still_bounded_by_the_cap(
@@ -370,11 +386,11 @@ def test_confident_retryable_still_bounded_by_the_cap(
 
     store, job_id = _run_failing(tmp_path, _judge_returning(Retryability.RETRYABLE, 0.99))
 
-    assert len(propose_calls) == policy.MAX_VERIFY_RETRIES + 1
+    assert len(propose_calls) == DEFAULT_MAX_RETRIES + 1
     job = store.get_job(job_id)
-    assert job is not None and job.retry_count == policy.MAX_VERIFY_RETRIES
-    outcomes = [e.payload["outcome"] for e in store.list_history(job_id)]
-    assert outcomes == ["retry"] * policy.MAX_VERIFY_RETRIES + ["fail"]
+    assert job is not None and job.retry_count == DEFAULT_MAX_RETRIES
+    outcomes = [e.payload["outcome"] for e in _events(store, job_id, EventType.JEV_JUDGMENT)]
+    assert outcomes == ["retry"] * DEFAULT_MAX_RETRIES + ["escalate"]
 
 
 def test_judge_that_raises_falls_back_to_fixed_rule_and_records_error(
@@ -387,9 +403,9 @@ def test_judge_that_raises_falls_back_to_fixed_rule_and_records_error(
 
     store, job_id = _run_failing(tmp_path, _boom)
 
-    assert len(propose_calls) == policy.MAX_VERIFY_RETRIES + 1
-    history = store.list_history(job_id)
-    assert len(history) == policy.MAX_VERIFY_RETRIES + 1
+    assert len(propose_calls) == DEFAULT_MAX_RETRIES + 1
+    history = _events(store, job_id, EventType.JEV_JUDGMENT)
+    assert len(history) == DEFAULT_MAX_RETRIES + 1
     output = history[0].payload["output"]
     assert isinstance(output, dict) and "TimeoutError" in str(output["error"])
 
@@ -401,7 +417,7 @@ def test_low_confidence_judgment_falls_back_to_fixed_rule(
 
     _run_failing(tmp_path, _judge_returning(Retryability.NOT_RETRYABLE, 0.1))
 
-    assert len(propose_calls) == policy.MAX_VERIFY_RETRIES + 1
+    assert len(propose_calls) == DEFAULT_MAX_RETRIES + 1
 
 
 def test_history_event_records_input_output_and_outcome_per_failure(
@@ -411,8 +427,7 @@ def test_history_event_records_input_output_and_outcome_per_failure(
 
     store, job_id = _run_failing(tmp_path, _judge_returning(Retryability.RETRYABLE, 0.9))
 
-    history = store.list_history(job_id)
-    assert all(e.event_type is EventType.JEV_JUDGMENT for e in history)
+    history = _events(store, job_id, EventType.JEV_JUDGMENT)
     assert [e.attempt for e in history] == [1, 2, 3]
     first = history[0].payload
     assert isinstance(first["input"], dict)
@@ -444,7 +459,7 @@ def test_no_history_event_when_verification_passes(
     )
 
     assert result.status is JobStatus.SUCCEEDED
-    assert store.list_history(job.id) == []
+    assert _events(store, job.id, EventType.JEV_JUDGMENT) == []
 
 
 def test_apply_and_verify_exceptions_are_recorded_as_step_errors(
@@ -459,7 +474,7 @@ def test_apply_and_verify_exceptions_are_recorded_as_step_errors(
     store = _store(tmp_path)
     job = store.create_job(SCENARIO)
     assert run_job(store, tmp_path, "t", job.id).status is JobStatus.FAILED
-    (event,) = store.list_history(job.id)
+    (event,) = _events(store, job.id, EventType.STEP_ERROR)
     assert (event.payload["step"], event.payload["error_type"]) == ("apply", "OSError")
 
     def _verify_boom(repo_root: Path) -> VerificationResult:
@@ -470,5 +485,5 @@ def test_apply_and_verify_exceptions_are_recorded_as_step_errors(
     job2 = store2.create_job(SCENARIO)
     result = run_job(store2, tmp_path, "t", job2.id, verify_fn=_verify_boom)
     assert result.status is JobStatus.FAILED
-    (event2,) = store2.list_history(job2.id)
+    (event2,) = _events(store2, job2.id, EventType.STEP_ERROR)
     assert (event2.payload["step"], event2.payload["error_type"]) == ("verify", "TimeoutError")

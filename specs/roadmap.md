@@ -57,7 +57,7 @@ Milestone 4).
 consults a real JEV judgment, and the deterministic policy — not JEV —
 remains the thing that actually sets the job's next state.
 
-## Milestone 4 — Budgets and escalation
+## Milestone 4 — Budgets and escalation — **Complete**
 
 - Per-job budget (max retries, max wall-clock time).
 - Policy forces `ESCALATE` when a budget would otherwise be exceeded, adding

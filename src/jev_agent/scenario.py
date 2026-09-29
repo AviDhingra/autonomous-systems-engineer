@@ -15,17 +15,18 @@ from pathlib import Path
 TARGET_DIR = "target/fleetops"
 
 
-def _git(repo_root: Path, *args: str) -> str:
+def _git(repo_root: Path, *args: str, stdin: bytes | None = None) -> str:
     completed = subprocess.run(
         ["git", *args],
         cwd=repo_root,
+        input=stdin,
         capture_output=True,
-        text=True,
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError(f"git {' '.join(args)} failed: {completed.stderr.strip()}")
-    return completed.stdout
+        stderr = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"git {' '.join(args)} failed: {stderr}")
+    return completed.stdout.decode("utf-8", errors="replace")
 
 
 @contextmanager
@@ -40,7 +41,10 @@ def injected_bug(repo_root: Path, scenario: str) -> Iterator[None]:
         raise RuntimeError(
             f"{TARGET_DIR} has uncommitted changes; commit or revert them before running a demo"
         )
-    _git(repo_root, "apply", str(patch))
+    # A checkout with `core.autocrlf=true` rewrites the patch file to CRLF,
+    # which `git apply` rejects as corrupt. Normalize to LF and feed it on stdin.
+    patch_bytes = patch.read_bytes().replace(b"\r\n", b"\n")
+    _git(repo_root, "apply", "-", stdin=patch_bytes)
     try:
         yield
     finally:
