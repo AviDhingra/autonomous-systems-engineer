@@ -56,14 +56,9 @@ def test_get_routes_do_not_change_the_store(tmp_path: Path) -> None:
 
 
 def test_seeded_demo_database_is_unchanged_by_browsing(tmp_path: Path) -> None:
-    from unittest import mock
-
-    from jev_agent import demo_console_seed
-
     url = f"sqlite:///{tmp_path / 'ro_seeded.db'}"
     store = JobStore(url)
-    with mock.patch.object(demo_console_seed, "WALL_CLOCK_SECONDS", 0.05):
-        seed_demo(store)
+    seed_demo(store, stand_in_judges=True, instant=True, sandbox_root=tmp_path / "sandboxes")
     before = _counts(store)
     client = TestClient(create_app(url))
 
