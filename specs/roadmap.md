@@ -43,7 +43,7 @@ per policy, without ever double-applying a file change, and eventually
 resolves to `FAILED` if retries are exhausted (escalation comes in
 Milestone 4).
 
-## Milestone 3 — JEV judgment
+## Milestone 3 — JEV judgment — **Complete**
 
 - Wire the real TypeSafe Jev SDK for the one designated judgment described
   in `architecture.md` (retryable vs. not, on `VERIFY` failure).

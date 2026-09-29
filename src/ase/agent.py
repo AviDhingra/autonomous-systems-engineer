@@ -7,7 +7,8 @@ from ase.models import FixProposal
 from ase.tools import read_file, search_code
 
 MODEL = "claude-sonnet-5"
-MAX_TOKENS = 4096
+MAX_TOKENS = 16000
+MAX_TOOL_TURNS = 30
 
 
 TOOLS: list[ToolParam] = [
@@ -103,6 +104,8 @@ def propose_fix(repo_root: Path, ticket: str) -> FixProposal:
         }
     ]
 
+    tool_turns = 0
+
     while True:
         response = client.messages.parse(
             model=MODEL,
@@ -118,6 +121,12 @@ def propose_fix(repo_root: Path, ticket: str) -> FixProposal:
         )
 
         if response.stop_reason == "tool_use":
+            tool_turns += 1
+            if tool_turns > MAX_TOOL_TURNS:
+                raise RuntimeError(
+                    f"Claude did not converge within {MAX_TOOL_TURNS} tool turns"
+                )
+
             tool_use = next(
                 block
                 for block in response.content

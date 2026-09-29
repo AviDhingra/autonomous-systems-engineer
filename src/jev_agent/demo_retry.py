@@ -10,8 +10,9 @@ then FAILED) is deterministic and demonstrable on every run.
 from pathlib import Path
 
 from ase.verify import CheckResult, VerificationResult
-from jev_agent.models import STEP_ORDER, CheckpointPhase, JobStatus
+from jev_agent.models import STEP_ORDER, CheckpointPhase, JobStatus, Judgment
 from jev_agent.runner import run_job
+from jev_agent.scenario import injected_bug
 from jev_agent.store import JobStore
 
 SCENARIO = "S02-unsupported-patch-fields"
@@ -32,6 +33,12 @@ def _always_failing_verify(repo_root: Path) -> VerificationResult:
     )
 
 
+def _no_judgment(state: dict[str, object]) -> Judgment:
+    """Keep this demo about the fixed retry cap: JEV is deliberately not
+    consulted, so policy falls back to its fixed rule (see `demo_judgment`)."""
+    raise RuntimeError("JEV disabled for the fixed-retry demo")
+
+
 def main() -> int:
     repo_root = Path.cwd()
     ticket = (repo_root / TICKET_PATH).read_text(encoding="utf-8")
@@ -40,7 +47,15 @@ def main() -> int:
     job = store.create_job(SCENARIO)
     print(f"Starting job {job.id} for scenario {SCENARIO} (forced VERIFY failure demo)")
 
-    job = run_job(store, repo_root, ticket, job.id, verify_fn=_always_failing_verify)
+    with injected_bug(repo_root, SCENARIO):
+        job = run_job(
+            store,
+            repo_root,
+            ticket,
+            job.id,
+            verify_fn=_always_failing_verify,
+            judge_fn=_no_judgment,
+        )
 
     checkpoints = store.list_checkpoints(job.id)
     for attempt in sorted({checkpoint.attempt for checkpoint in checkpoints}):

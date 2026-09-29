@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from jev_agent.models import CheckpointPhase, JobStatus, StepName
+from jev_agent.models import CheckpointPhase, EventType, JobStatus, StepName
 from jev_agent.store import JobStore
 
 
@@ -104,3 +104,33 @@ def test_find_active_job_returns_none_for_unknown_scenario(tmp_path: Path) -> No
     store = _store(tmp_path)
 
     assert store.find_active_job("no-such-scenario") is None
+
+
+# --- Milestone 3: execution_history ---
+
+
+def test_history_round_trips_payload_in_insertion_order(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'history_test.db'}")
+    job = store.create_job("S02-unsupported-patch-fields")
+
+    first = store.append_history_event(
+        job.id, 1, EventType.JEV_JUDGMENT, {"n": 1, "nested": {"a": [1]}}
+    )
+    second = store.append_history_event(job.id, 2, EventType.JEV_JUDGMENT, {"n": 2})
+
+    events = store.list_history(job.id)
+    assert [e.id for e in events] == [first.id, second.id]
+    assert events[0].payload == {"n": 1, "nested": {"a": [1]}}
+    assert [e.attempt for e in events] == [1, 2]
+    assert all(e.event_type is EventType.JEV_JUDGMENT for e in events)
+
+
+def test_history_is_scoped_per_job(tmp_path: Path) -> None:
+    store = JobStore(f"sqlite:///{tmp_path / 'history_scope_test.db'}")
+    a = store.create_job("S02-unsupported-patch-fields")
+    b = store.create_job("S02-unsupported-patch-fields")
+
+    store.append_history_event(a.id, 1, EventType.JEV_JUDGMENT, {"job": "a"})
+
+    assert store.list_history(b.id) == []
+    assert [e.payload for e in store.list_history(a.id)] == [{"job": "a"}]

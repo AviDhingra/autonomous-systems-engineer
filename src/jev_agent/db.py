@@ -29,3 +29,14 @@ class CheckpointRow(Base):
     attempt: Mapped[int] = mapped_column(Integer, default=1)
     state: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ExecutionHistoryRow(Base):
+    __tablename__ = "execution_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(36), ForeignKey("jobs.id"), index=True)
+    attempt: Mapped[int] = mapped_column(Integer)
+    event_type: Mapped[str] = mapped_column(String(30))
+    payload: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
