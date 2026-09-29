@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}How it works{% endblock %}
+{% block content %}
+<h1>How it works</h1>
+<p class="lede">Every job runs the same governed loop. The frontier model does the reasoning; plain Python decides what happens.</p>
+
+<ol class="loop">
+  <li><strong>Propose</strong> ({{ actors.model.label }}): investigates the bug and proposes one file change.</li>
+  <li><strong>Apply</strong> ({{ actors.python.label }}): writes the change, after saving the original so it can be rolled back.</li>
+  <li><strong>Verify</strong> ({{ actors.python.label }}): runs pytest, Ruff and mypy. Passing means the job succeeds.</li>
+  <li><strong>Judge</strong> ({{ actors.jev.label }}): if verification fails, JEV is asked whether the failure is worth retrying.</li>
+  <li><strong>Decide</strong> ({{ actors.policy.label }}): policy weighs JEV's answer against the retry and time budgets, then retries (rolling back first), escalates to a person, or fails the job.</li>
+</ol>
+
+<h2>Who holds authority</h2>
+<dl class="actors">
+  {% for actor in actors.values() %}
+  <dt class="actor-{{ actor.key }}">{{ actor.label }}</dt>
+  <dd>{{ actor.role }}</dd>
+  {% endfor %}
+</dl>
+
+<h2>Checkpoints make it recoverable</h2>
+<p>Each step is recorded before it starts and after it finishes. If the process dies, the job resumes at the first step without a durable result: completed work is never redone.</p>
+
+<p><a href="/tour">Take the tour</a> · <a href="/#run">Run a scenario</a></p>
+{% endblock %}

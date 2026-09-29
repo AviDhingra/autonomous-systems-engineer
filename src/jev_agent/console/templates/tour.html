@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Tour{% endblock %}
+{% block content %}
+<h1>Tour</h1>
+<p class="lede">Six reliability patterns, each with a story you can run and watch.</p>
+
+<ol class="tour">
+  {% for step in steps %}
+  <li class="tour-step" id="{{ step.key }}">
+    <h2>{{ loop.index }}. {{ step.title }}</h2>
+    <p>{{ step.explanation }}</p>
+    {% if step.story_name %}
+    {% set story = stories_by_name[step.story_name] %}
+    <form method="post" action="/simulations">
+      <input type="hidden" name="story" value="{{ story.name }}">
+      <button type="submit"{% if live_job_id %} disabled title="A simulated run is already in progress"{% endif %}>Run “{{ story.title }}”</button>
+      {% if step.latest_job %}<a href="/jobs/{{ step.latest_job.id }}">See the latest run</a>{% endif %}
+    </form>
+    {% else %}
+    <p><a href="/escalations">See escalations waiting for a person</a></p>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% endblock %}

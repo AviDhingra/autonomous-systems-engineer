@@ -285,4 +285,4 @@ def test_seeded_interrupted_job_page_shows_resume(tmp_path: Path) -> None:
     page = TestClient(create_app(url)).get(f"/jobs/{jobs['crash-resume'].id}").text
 
     assert "resumed after interruption" in page
-    assert page.count("Attempt ") == 1
+    assert page.count('class="track"') == 1

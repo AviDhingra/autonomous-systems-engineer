@@ -12,12 +12,21 @@
     <div class="wrap">
       <a class="brand" href="/">JEV Execution Console</a>
       <nav>
-        <a href="/">Jobs</a>
-        <a href="/escalations">Escalations</a>
+        <a href="/">Overview</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/tour">Tour</a>
+        <a href="/jobs">Jobs</a>
+        <a href="/escalations">Escalations{% if pending_escalation_count %} <span class="count">{{ pending_escalation_count }}</span>{% endif %}</a>
       </nav>
     </div>
   </header>
+  {% if not jev_configured %}
+  <div class="banner" role="status">
+    <div class="wrap">JEV is not configured (<code>TYPESAFE_API_KEY</code> is unset): simulated runs will fall back to policy's fixed retry rule instead of a live JEV judgment.</div>
+  </div>
+  {% endif %}
   <main class="wrap">
+    {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
 </body>

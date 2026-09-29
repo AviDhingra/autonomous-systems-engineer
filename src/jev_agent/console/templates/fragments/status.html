@@ -1,14 +1,54 @@
-<section id="job-status" class="status-panel"
-  {%- if active %} hx-get="/jobs/{{ job.id }}/status" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
-  <span class="badge {{ badge }} badge-lg">{{ label }}</span>
-  <dl class="facts inline">
-    <div>
-      <dt>Retries used</dt>
-      <dd class="{{ 'over' if budget.retries_exhausted }}">{{ budget.retries_used }} / {{ budget.max_retries }}</dd>
+<section id="job-status" class="status-block"
+  {%- if active %} hx-get="/jobs/{{ job.id }}/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  <div class="status-panel">
+    <span class="badge {{ badge }} badge-lg">{{ label }}</span>
+    <dl class="facts inline">
+      <div>
+        <dt>Retries used</dt>
+        <dd class="{{ 'over' if budget.retries_exhausted }}">{{ budget.retries_used }} / {{ budget.max_retries }}</dd>
+      </div>
+      <div>
+        <dt>Time used</dt>
+        <dd class="{{ 'over' if budget.wall_clock_exceeded }}">{{ budget.elapsed_label }} / {{ budget.max_wall_clock_label }}</dd>
+      </div>
+    </dl>
+    {% if interrupted %}
+    <form method="post" action="/jobs/{{ job.id }}/resume" class="resume">
+      <button type="submit"{% if live_job_id %} disabled title="Another simulated run is in progress"{% endif %}>Resume from last checkpoint</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if interrupted %}
+  <p class="hint">The process stopped mid-run. Resume continues at the first step without a durable result; completed steps are not redone.</p>
+  {% endif %}
+
+  <div class="tracks">
+    {% for track in tracks %}
+    <div class="track" data-attempt="{{ track.attempt }}">
+      <p class="track-title">Attempt {{ track.attempt }}</p>
+      <ol class="stepper">
+        {% for step in track.pipeline %}
+        <li class="pipe-step pipe-{{ step.state }} actor-{{ step.actor.key }}">
+          <span class="pipe-name">{{ step.label }}</span>
+          <span class="pipe-actor">{{ step.actor.label }}</span>
+          <span class="pipe-state">{{ step.state }}</span>
+          <span class="pipe-detail">{{ step.detail }}</span>
+        </li>
+        {% endfor %}
+      </ol>
+      {% if track.decision %}
+      {% set d = track.decision %}
+      <div class="decision decision-{{ d.outcome }}">
+        <p class="decision-jev actor-jev">
+          {% if d.judgment %}JEV: {{ d.judgment.retryability.replace('_', ' ') }} ({{ d.judgment.confidence_label }} confidence)
+          {% else %}JEV unavailable{% if d.jev_error %}: {{ d.jev_error }}{% endif %}{% endif %}
+        </p>
+        <p class="decision-outcome actor-policy">Policy: {{ d.outcome_label }}{% if d.escalation_reason %} ({{ d.escalation_reason }}){% endif %}</p>
+        <p class="decision-why">{{ d.explanation }}</p>
+        <p class="decision-budget">{{ d.retries }} · {{ d.elapsed }}</p>
+      </div>
+      {% endif %}
     </div>
-    <div>
-      <dt>Time used</dt>
-      <dd class="{{ 'over' if budget.wall_clock_exceeded }}">{{ budget.elapsed_label }} / {{ budget.max_wall_clock_label }}</dd>
-    </div>
-  </dl>
+    {% endfor %}
+  </div>
 </section>

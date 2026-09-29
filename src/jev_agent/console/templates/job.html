@@ -2,9 +2,12 @@
 {% from "_macros.html" import escalation_card %}
 {% block title %}Job {{ job.id[:8] }}{% endblock %}
 {% block content %}
-<p class="crumb"><a href="/">&larr; All jobs</a></p>
-<h1>Job <code>{{ job.id[:8] }}</code></h1>
-<p class="lede">{{ job.scenario }} · created {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</p>
+<p class="crumb"><a href="/jobs">&larr; All jobs</a></p>
+<h1>Job <code>{{ job.id[:8] }}</code>{% if story %} <span class="tag tag-sim">Simulated</span>{% endif %}</h1>
+<p class="lede">
+  {% if story %}{{ story.title }}: {{ story.summary }}{% else %}{{ job.scenario }}{% endif %}
+  · created {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+</p>
 
 {% include "fragments/status.html" %}
 

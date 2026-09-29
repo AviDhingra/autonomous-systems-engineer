@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>A coding agent you can leave running</h1>
+  <p class="lede">A frontier model proposes fixes for a real bug. Deterministic Python policy decides what happens next: it checkpoints every step, recovers from crashes, retries within a budget, consults a narrow JEV judgment, and escalates to a person instead of guessing.</p>
+  <p><a href="/how-it-works">How it works</a> · <a href="/tour">Take the tour</a></p>
+</section>
+
+<section>
+  <h2>At a glance</h2>
+  <dl class="stats">
+    <div><dt>Jobs</dt><dd>{{ stats.total }}</dd></div>
+    <div><dt>Succeeded</dt><dd>{{ stats.succeeded }}</dd></div>
+    <div><dt>Success rate</dt><dd>{{ stats.success_rate_label }}</dd></div>
+    <div><dt>Retries</dt><dd>{{ stats.retries }}</dd></div>
+    <div><dt>Waiting on a person</dt><dd>{{ stats.pending_escalations }}</dd></div>
+  </dl>
+  {% if stats.breakdown %}
+  <ul class="breakdown">
+    {% for slice in stats.breakdown %}
+    <li>{{ badge(slice.badge, slice.label) }} {{ slice.count }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section id="run">
+  <h2>Run a scenario</h2>
+  <p class="lede">Each story runs the real governance code with simulated Propose, Apply and Verify steps; the JEV judgment is live. Pick one and watch it.</p>
+  {% include "_run_story.html" %}
+</section>
+
+<section>
+  <h2>Recent jobs</h2>
+  {% if recent %}
+  <ul class="recent">
+    {% for row in recent %}
+    <li><a href="/jobs/{{ row.job.id }}"><code>{{ row.job.id[:8] }}</code></a> {{ badge(row.badge, row.label) }} {{ row.story_title or row.job.scenario }} · {{ row.elapsed }}</li>
+    {% endfor %}
+  </ul>
+  <p><a href="/jobs">All jobs</a></p>
+  {% else %}
+  <p class="empty">No jobs yet. Run a scenario above to see one.</p>
+  {% endif %}
+</section>
+{% endblock %}
