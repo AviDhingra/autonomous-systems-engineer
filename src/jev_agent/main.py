@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from jev_agent.history_format import format_escalation
 from jev_agent.models import STEP_ORDER, CheckpointPhase, JobStatus
 from jev_agent.runner import run_job
 from jev_agent.store import JobStore
@@ -35,6 +36,8 @@ def main() -> int:
     job = run_job(store, repo_root, ticket, job.id)
 
     print(f"\nJob {job.id} finished with status: {job.status.value}")
+    for escalation in store.list_escalations(job.id):
+        print(format_escalation(escalation))
 
     return 0 if job.status is JobStatus.SUCCEEDED else 1
 

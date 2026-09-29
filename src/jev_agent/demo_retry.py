@@ -4,7 +4,7 @@
 outcome isn't reproducible on demand. This demo uses `run_job`'s `verify_fn`
 injection seam to force VERIFY to fail on every attempt, independent of what
 the LLM actually proposed, so the retry-exhaustion path (bounded retries,
-then FAILED) is deterministic and demonstrable on every run.
+then escalation) is deterministic and demonstrable on every run.
 """
 
 from pathlib import Path
@@ -72,7 +72,7 @@ def main() -> int:
     print(f"\nJob {job.id} finished with status: {job.status.value}")
     print(f"Retries consumed: {job.retry_count}")
 
-    return 0 if job.status is JobStatus.FAILED else 1
+    return 0 if job.status is JobStatus.WAITING_ON_ESCALATION else 1
 
 
 if __name__ == "__main__":

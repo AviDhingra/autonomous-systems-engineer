@@ -11,12 +11,12 @@ SQLite.
 Needs `ANTHROPIC_API_KEY` (PROPOSE) and `TYPESAFE_API_KEY` (JEV).
 """
 
-import json
 import os
 from pathlib import Path
 
 from ase.verify import CheckResult, VerificationResult
-from jev_agent.models import EventType, JobStatus
+from jev_agent.history_format import format_escalation, format_history
+from jev_agent.models import JobStatus
 from jev_agent.runner import run_job
 from jev_agent.scenario import injected_bug
 from jev_agent.store import JobStore
@@ -45,7 +45,7 @@ _REALISTIC_PYTEST_FAILURE = "\n".join(
 )
 
 
-def _always_failing_verify(repo_root: Path) -> VerificationResult:
+def realistic_failing_verify(repo_root: Path) -> VerificationResult:
     """Force VERIFY to fail on every attempt, with realistic failure text."""
     return VerificationResult(
         checks=[
@@ -74,27 +74,17 @@ def main() -> int:
     print(f"Starting job {job.id} for scenario {SCENARIO} (real JEV judgment demo)")
 
     with injected_bug(repo_root, SCENARIO):
-        job = run_job(store, repo_root, ticket, job.id, verify_fn=_always_failing_verify)
+        job = run_job(store, repo_root, ticket, job.id, verify_fn=realistic_failing_verify)
 
     print("\nExecution history:")
-    for event in store.list_history(job.id):
-        if event.event_type is EventType.STEP_ERROR:
-            print(
-                f"- attempt {event.attempt} {event.event_type.value}: "
-                f"{event.payload['step']} raised {event.payload['error_type']}: "
-                f"{event.payload['message']}"
-            )
-            continue
-        output = event.payload["output"]
-        print(
-            f"- attempt {event.attempt} {event.event_type.value}: "
-            f"jev={json.dumps(output)} -> policy={event.payload['outcome']}"
-        )
+    print(format_history(store.list_history(job.id)))
 
     print(f"\nJob {job.id} finished with status: {job.status.value}")
     print(f"Retries consumed: {job.retry_count}")
+    for escalation in store.list_escalations(job.id):
+        print(format_escalation(escalation))
 
-    return 0 if job.status is JobStatus.FAILED else 1
+    return 0 if job.status is JobStatus.WAITING_ON_ESCALATION else 1
 
 
 if __name__ == "__main__":

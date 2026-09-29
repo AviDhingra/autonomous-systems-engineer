@@ -59,3 +59,17 @@ def test_refuses_to_start_on_a_dirty_target_tree(repo: Path) -> None:
     with pytest.raises(RuntimeError, match="uncommitted"), injected_bug(repo, SCENARIO):
         pass
     assert mod.read_text(encoding="utf-8") == "uncommitted\n"
+
+
+def test_crlf_patch_file_still_applies(repo: Path) -> None:
+    # `core.autocrlf=true` checkouts rewrite the patch to CRLF, which plain
+    # `git apply <file>` rejects as corrupt.
+    patch = repo / "scenarios" / SCENARIO / "bug.patch"
+    patch.write_bytes(patch.read_bytes().replace(b"\n", b"\r\n"))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "crlf patch")
+    mod = repo / "target" / "fleetops" / "mod.py"
+
+    with injected_bug(repo, SCENARIO):
+        assert mod.read_text(encoding="utf-8") == "keep\nend\n"
+    assert mod.read_text(encoding="utf-8") == "keep\nguard\nend\n"
