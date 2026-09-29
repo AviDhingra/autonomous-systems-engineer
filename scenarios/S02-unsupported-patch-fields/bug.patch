@@ -1,3 +1,4 @@
+diff --git a/target/fleetops/app/services/devices.py b/target/fleetops/app/services/devices.py
 --- a/target/fleetops/app/services/devices.py
 +++ b/target/fleetops/app/services/devices.py
 @@ -39,13 +39,6 @@ class DeviceService:
