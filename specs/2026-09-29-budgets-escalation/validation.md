@@ -85,6 +85,37 @@ Milestone 4 defect, since the deterministic paths are proven by the tests.
 Record the actual run (date, judgments seen, escalation reason, final status)
 in this file when done.
 
+**Actual runs (2026-09-29):** S02 with `bug.patch` injected, forced VERIFY
+failure with realistic pytest text, real JEV, `--max-retries 1` (default).
+
+1. **Retry budget** (`python -m jev_agent.demo_escalation`, job
+   `0d385fdc-7e19-49a9-aaad-5f5c64b867c0`). Attempt 1: JEV `retryable` at 0.99
+   -> `RETRY`; the failed change was rolled back and a `retry` event
+   recorded; attempt 2 ran a fresh real investigation on the restored bug.
+   Attempt 2: JEV `not_retryable` at 0.2 (below the 0.5 minimum, so ignored),
+   yet policy decided `ESCALATE` because the retry budget was spent. Final
+   status `waiting_on_escalation`, `retry_count == 1 of 1`, escalation
+   `retry_budget_exhausted`, `pending`, elapsed 62.7s of 1800s.
+2. **Wall-clock budget** (`--budget-seconds 5`, job
+   `1135f786-b789-4a81-ad8c-a5b6636edcdd`). Attempt 1's VERIFY failed after
+   42.5s against a 5s budget. JEV said `retryable` at 0.99 and policy
+   escalated anyway: escalation `wall_clock_exceeded`, `retry_count 0 of 1`,
+   so a confident judgment cannot outrun a budget.
+
+Both runs' printed history showed the ordered transitions, judgments, and (in
+run 1) rollback and retry events, ending in the `escalation` event; the store
+rows (`jobs`, `escalations`) match the printed status and reason, and
+`target/fleetops` was back at baseline afterward.
+
+Two fixes surfaced during the demo and are covered by tests: a stale
+`jev_agent.db` from earlier milestones now fails with a clear schema message
+instead of an SQL error, and `injected_bug` normalizes a CRLF-checked-out
+`bug.patch` (Windows `core.autocrlf`) before applying it.
+
+Not shown live: a confident `not_retryable` escalating on its own with the
+budget still available (`JEV_NOT_RETRYABLE`); covered by
+`test_confident_not_retryable_escalates_and_low_confidence_falls_back`.
+
 ## Definition of done
 
 - All automated checks pass.
