@@ -1,3 +1,7 @@
+{%- set path = request.url.path -%}
+{%- macro nav(href, text, match) -%}
+<a href="{{ href }}"{% if match %} aria-current="page"{% endif %}>{{ text }}</a>
+{%- endmacro -%}
 <!doctype html>
 <html lang="en">
 <head>
@@ -5,29 +9,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Execution console{% endblock %} · JEV Execution Console</title>
   <link rel="stylesheet" href="/static/console.css">
+  {# Both enhance pages that already work without them (no-JS fallback). #}
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
 </head>
-<body>
+<body x-data>
+  <a class="sr-only" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap">
-      <a class="brand" href="/">JEV Execution Console</a>
-      <nav>
-        <a href="/">Overview</a>
-        <a href="/how-it-works">How it works</a>
-        <a href="/tour">Tour</a>
-        <a href="/jobs">Jobs</a>
-        <a href="/escalations">Escalations{% if pending_escalation_count %} <span class="count">{{ pending_escalation_count }}</span>{% endif %}</a>
+      <a class="brand" href="/">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2" y="2" width="20" height="20" rx="6" fill="#2a78d6"/>
+          <path d="M7 12.5l3.2 3.2L17 8.8" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        JEV Execution Console
+      </a>
+      <nav aria-label="Main">
+        {{ nav("/", "Overview", path == "/") }}
+        {{ nav("/how-it-works", "How it works", path == "/how-it-works") }}
+        {{ nav("/tour", "Tour", path == "/tour") }}
+        {{ nav("/jobs", "Jobs", path.startswith("/jobs")) }}
+        <a href="/escalations"{% if path == "/escalations" %} aria-current="page"{% endif %}>Escalations{% if pending_escalation_count %} <span class="count" aria-label="{{ pending_escalation_count }} pending">{{ pending_escalation_count }}</span>{% endif %}</a>
       </nav>
+      <a class="button" href="/#run" @click.prevent="$refs.run.showModal()">Run a scenario</a>
     </div>
   </header>
   {% if not jev_configured %}
   <div class="banner" role="status">
-    <div class="wrap">JEV is not configured (<code>TYPESAFE_API_KEY</code> is unset): simulated runs will fall back to policy's fixed retry rule instead of a live JEV judgment.</div>
+    <div class="wrap"><strong>JEV is not configured.</strong> <code>TYPESAFE_API_KEY</code> is unset, so simulated runs fall back to policy's fixed retry rule instead of a live JEV judgment.</div>
   </div>
   {% endif %}
-  <main class="wrap">
-    {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+  <main class="wrap" id="main">
+    {% if notice %}
+    <div class="toast" role="status" x-data="{ open: true }" x-show="open" x-init="setTimeout(() => open = false, 8000)">
+      <span>{{ notice }}</span>
+      <button type="button" aria-label="Dismiss" @click="open = false">×</button>
+    </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
+
+  <dialog class="run-dialog" x-ref="run" aria-labelledby="run-dialog-title">
+    <div class="dialog-head">
+      <h2 id="run-dialog-title">Run a scenario</h2>
+      <button type="button" class="button-secondary" @click="$refs.run.close()">Close</button>
+    </div>
+    <div class="dialog-body">
+      <p class="lede">Each story runs the real governance code with simulated Propose, Apply and Verify steps. The JEV judgment is live. Pick one and watch it.</p>
+      {% include "_run_story.html" %}
+    </div>
+  </dialog>
 </body>
 </html>

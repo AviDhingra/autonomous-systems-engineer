@@ -1,5 +1,9 @@
 {% macro badge(css, label) -%}
-<span class="badge {{ css }}">{{ label }}</span>
+<span class="badge {{ css }}"><span class="dot" aria-hidden="true"></span>{{ label }}</span>
+{%- endmacro %}
+
+{% macro actor_chip(actor) -%}
+<span class="actor-chip actor-{{ actor.key }}">{{ actor.label }}</span>
 {%- endmacro %}
 
 {% macro escalation_card(view, show_job=False) -%}
@@ -7,12 +11,10 @@
 <article class="card escalation {{ 'is-resolved' if view.resolved else 'is-pending' }}">
   <header class="card-head">
     <h3>#{{ e.id }} · {{ view.reason_label }}</h3>
-    <span class="badge {{ 'badge-succeeded' if view.resolved else 'badge-escalated' }}">
-      {{ 'Resolved' if view.resolved else 'Pending' }}
-    </span>
+    {{ badge('badge-succeeded' if view.resolved else 'badge-escalated', 'Resolved' if view.resolved else 'Waiting on a person') }}
   </header>
   <dl class="facts">
-    {% if show_job %}<dt>Job</dt><dd><a href="/jobs/{{ e.job_id }}">{{ e.job_id[:8] }}</a></dd>{% endif %}
+    {% if show_job %}<dt>Job</dt><dd><a href="/jobs/{{ e.job_id }}"><code>{{ e.job_id[:8] }}</code></a></dd>{% endif %}
     <dt>Attempt</dt><dd>{{ e.attempt }}</dd>
     <dt>Retries used</dt><dd>{{ view.retries }}</dd>
     <dt>Time used</dt><dd>{{ view.elapsed }}</dd>
@@ -29,7 +31,7 @@
   <p class="resolution">Resolved {{ e.resolved_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC{% if e.resolution_note %}: “{{ e.resolution_note }}”{% endif %}</p>
   {% else %}
   <form method="post" action="/escalations/{{ e.id }}/resolve" class="resolve">
-    <input type="text" name="note" placeholder="Optional note" aria-label="Resolution note">
+    <input type="text" name="note" placeholder="What did you decide? (optional)" aria-label="Resolution note">
     <button type="submit">Mark resolved</button>
   </form>
   {% endif %}

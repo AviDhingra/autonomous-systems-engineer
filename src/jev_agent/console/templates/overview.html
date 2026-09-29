@@ -3,44 +3,79 @@
 {% block title %}Overview{% endblock %}
 {% block content %}
 <section class="hero">
-  <h1>A coding agent you can leave running</h1>
-  <p class="lede">A frontier model proposes fixes for a real bug. Deterministic Python policy decides what happens next: it checkpoints every step, recovers from crashes, retries within a budget, consults a narrow JEV judgment, and escalates to a person instead of guessing.</p>
-  <p><a href="/how-it-works">How it works</a> · <a href="/tour">Take the tour</a></p>
+  <div>
+    <h1>A coding agent you can leave running</h1>
+    <p class="lede">A frontier model proposes fixes for a real bug. Deterministic Python policy decides what happens next: it checkpoints every step, recovers from crashes, retries within a budget, consults a narrow JEV judgment, and escalates to a person instead of guessing.</p>
+    <div class="hero-actions">
+      <a class="button button-lg" href="#run">Run a scenario</a>
+      <a class="button button-secondary button-lg" href="/tour">Take the tour</a>
+      <a class="button button-secondary button-lg" href="/how-it-works">How it works</a>
+    </div>
+  </div>
+  <div class="hero-flow" aria-label="Who does what">
+    <ol>
+      <li class="flow-row actor-model"><strong>Propose</strong><span>{{ actors.model.label }} reasons about the bug</span></li>
+      <li class="flow-row actor-python"><strong>Apply · Verify</strong><span>Python writes the fix, runs pytest, Ruff, mypy</span></li>
+      <li class="flow-row actor-jev"><strong>Judge</strong><span>JEV: is this failure worth retrying?</span></li>
+      <li class="flow-row actor-policy"><strong>Decide</strong><span>Policy retries, escalates or stops, within budget</span></li>
+      <li class="flow-row actor-human"><strong>Resolve</strong><span>A person handles what the system won't guess</span></li>
+    </ol>
+  </div>
 </section>
 
-<section>
-  <h2>At a glance</h2>
+<section aria-labelledby="glance">
+  <h2 id="glance">At a glance</h2>
   <dl class="stats">
-    <div><dt>Jobs</dt><dd>{{ stats.total }}</dd></div>
-    <div><dt>Succeeded</dt><dd>{{ stats.succeeded }}</dd></div>
-    <div><dt>Success rate</dt><dd>{{ stats.success_rate_label }}</dd></div>
-    <div><dt>Retries</dt><dd>{{ stats.retries }}</dd></div>
-    <div><dt>Waiting on a person</dt><dd>{{ stats.pending_escalations }}</dd></div>
+    <div class="stat"><dt>Jobs run</dt><dd>{{ stats.total }}</dd></div>
+    <div class="stat"><dt>Succeeded</dt><dd>{{ stats.succeeded }}</dd></div>
+    <div class="stat"><dt>Success rate</dt><dd>{{ stats.success_rate_label }}</dd></div>
+    <div class="stat"><dt>Retries taken</dt><dd>{{ stats.retries }}</dd></div>
+    <div class="stat"><dt>Waiting on a person</dt><dd>{{ stats.pending_escalations }}</dd></div>
   </dl>
   {% if stats.breakdown %}
-  <ul class="breakdown">
-    {% for slice in stats.breakdown %}
-    <li>{{ badge(slice.badge, slice.label) }} {{ slice.count }}</li>
-    {% endfor %}
-  </ul>
+  <div class="breakdown">
+    <div class="breakdown-bar" role="img" aria-label="Jobs by status: {% for s in stats.breakdown %}{{ s.label }} {{ s.count }}{{ ', ' if not loop.last }}{% endfor %}">
+      {% for s in stats.breakdown %}<span class="seg-{{ s.status.value }}" style="flex: {{ s.count }}" title="{{ s.label }}: {{ s.count }} ({{ '%.0f' % s.percent }}%)"></span>{% endfor %}
+    </div>
+    <ul>
+      {% for s in stats.breakdown %}
+      <li>{{ badge(s.badge, s.label) }} {{ s.count }}</li>
+      {% endfor %}
+    </ul>
+  </div>
   {% endif %}
 </section>
 
-<section id="run">
-  <h2>Run a scenario</h2>
-  <p class="lede">Each story runs the real governance code with simulated Propose, Apply and Verify steps; the JEV judgment is live. Pick one and watch it.</p>
+<section id="run" aria-labelledby="run-title">
+  <div class="section-head">
+    <h2 id="run-title">Run a scenario</h2>
+  </div>
+  <p class="lede">Each story runs the real governance code with simulated Propose, Apply and Verify steps; the JEV judgment is live. Pick one and watch it happen.</p>
   {% include "_run_story.html" %}
 </section>
 
-<section>
-  <h2>Recent jobs</h2>
+<section aria-labelledby="recent-title">
+  <div class="section-head">
+    <h2 id="recent-title">Recent jobs</h2>
+    {% if recent %}<a href="/jobs">All jobs →</a>{% endif %}
+  </div>
   {% if recent %}
-  <ul class="recent">
-    {% for row in recent %}
-    <li><a href="/jobs/{{ row.job.id }}"><code>{{ row.job.id[:8] }}</code></a> {{ badge(row.badge, row.label) }} {{ row.story_title or row.job.scenario }} · {{ row.elapsed }}</li>
-    {% endfor %}
-  </ul>
-  <p><a href="/jobs">All jobs</a></p>
+  <div class="table-wrap">
+    <table class="jobs">
+      <thead><tr><th>Job</th><th>What</th><th>Status</th><th>Retries</th><th>Elapsed</th></tr></thead>
+      <tbody>
+        {% for row in recent %}
+        <tr>
+          <td><a href="/jobs/{{ row.job.id }}"><code>{{ row.job.id[:8] }}</code></a></td>
+          <td>{% if row.story_title %}<span class="tag">Simulated</span> {{ row.story_title }}{% else %}{{ row.job.scenario }}{% endif %}</td>
+          <td>{{ badge(row.badge, row.label) }}</td>
+          <td class="num">{{ row.job.retry_count }} / {{ row.job.budget.max_retries }}</td>
+          <td class="num">{{ row.elapsed }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
   <p class="empty">No jobs yet. Run a scenario above to see one.</p>
   {% endif %}

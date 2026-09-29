@@ -333,7 +333,9 @@ def escalation_view(escalation: Escalation) -> EscalationView:
             f"({float(judgment.get('confidence') or 0):.0%} confidence)"
         )
     else:
-        judgment_text = "none consulted"
+        # Either JEV was unavailable or no judgment was due (a budget ran out
+        # before the attempt started); either way policy did not rely on one.
+        judgment_text = "no usable judgment"
     return EscalationView(
         escalation=escalation,
         reason_label=REASON_LABELS.get(escalation.reason.value, escalation.reason.value),

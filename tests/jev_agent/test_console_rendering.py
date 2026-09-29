@@ -242,7 +242,7 @@ def test_escalation_view_readable_facts() -> None:
     assert view.reason_label == "Wall-clock budget exceeded"
     assert view.retries == "1 of 3"
     assert view.elapsed == "11m 40s of 10m 0s"
-    assert view.judgment == "none consulted"
+    assert view.judgment == "no usable judgment"
     assert view.failure_output == "boom"
     assert not view.resolved
 

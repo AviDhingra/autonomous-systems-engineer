@@ -1,7 +1,8 @@
-<section id="job-status" class="status-block"
+{% from "_macros.html" import badge as badge_pill %}
+<section id="job-status"
   {%- if active %} hx-get="/jobs/{{ job.id }}/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
   <div class="status-panel">
-    <span class="badge {{ badge }} badge-lg">{{ label }}</span>
+    {{ badge_pill(badge ~ " badge-lg", label) }}
     <dl class="facts inline">
       <div>
         <dt>Retries used</dt>
@@ -20,6 +21,8 @@
   </div>
   {% if interrupted %}
   <p class="hint">The process stopped mid-run. Resume continues at the first step without a durable result; completed steps are not redone.</p>
+  {% elif live %}
+  <p class="hint" aria-live="polite">Running now. This view updates by itself.</p>
   {% endif %}
 
   <div class="tracks">
@@ -36,19 +39,20 @@
         </li>
         {% endfor %}
       </ol>
-      {% if track.decision %}
-      {% set d = track.decision %}
-      <div class="decision decision-{{ d.outcome }}">
-        <p class="decision-jev actor-jev">
-          {% if d.judgment %}JEV: {{ d.judgment.retryability.replace('_', ' ') }} ({{ d.judgment.confidence_label }} confidence)
-          {% else %}JEV unavailable{% if d.jev_error %}: {{ d.jev_error }}{% endif %}{% endif %}
-        </p>
-        <p class="decision-outcome actor-policy">Policy: {{ d.outcome_label }}{% if d.escalation_reason %} ({{ d.escalation_reason }}){% endif %}</p>
-        <p class="decision-why">{{ d.explanation }}</p>
-        <p class="decision-budget">{{ d.retries }} · {{ d.elapsed }}</p>
-      </div>
-      {% endif %}
     </div>
+    {% if track.decision %}
+    {% set d = track.decision %}
+    <div class="decision-connector" aria-hidden="true"></div>
+    <div class="decision decision-{{ d.outcome }}">
+      <div class="decision-row">
+        <span class="decision-chip actor-jev">{% if d.judgment %}JEV: {{ d.judgment.retryability.replace('_', ' ') }} ({{ d.judgment.confidence_label }} confidence){% else %}JEV unavailable{% if d.jev_error %}: {{ d.jev_error }}{% endif %}{% endif %}</span>
+        <span class="decision-chip actor-policy"><strong>Policy: {{ d.outcome_label }}{% if d.escalation_reason %} ({{ d.escalation_reason }}){% endif %}</strong></span>
+      </div>
+      <p class="decision-why">{{ d.explanation }}</p>
+      <p class="decision-budget">{{ d.retries }} · {{ d.elapsed }}</p>
+    </div>
+    {% if not loop.last %}<div class="decision-connector" aria-hidden="true"></div>{% endif %}
+    {% endif %}
     {% endfor %}
   </div>
 </section>
