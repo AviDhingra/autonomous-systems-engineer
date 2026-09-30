@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 
 from jev_agent import demo_console_seed
+from jev_agent import judgment as judgment_module
 from jev_agent.console import __main__ as console_main
 from jev_agent.demo_console_seed import seed_demo
 from jev_agent.models import (
@@ -14,18 +15,19 @@ from jev_agent.models import (
     HistoryEvent,
     Job,
     JobStatus,
+    Judgment,
     ResolutionState,
     StepName,
 )
+from jev_agent.simulation import INSTANT
 from jev_agent.store import JobStore
 
 
 @pytest.fixture(scope="module")
 def seeded(tmp_path_factory: pytest.TempPathFactory) -> tuple[JobStore, dict[str, Job]]:
-    store = JobStore(f"sqlite:///{tmp_path_factory.mktemp('seed') / 'seed_test.db'}")
-    # The wall-clock story really sleeps; shrink it so the suite stays fast.
-    with mock.patch.object(demo_console_seed, "WALL_CLOCK_SECONDS", 0.05):
-        jobs = seed_demo(store)
+    tmp = tmp_path_factory.mktemp("seed")
+    store = JobStore(f"sqlite:///{tmp / 'seed_test.db'}")
+    jobs = seed_demo(store, stand_in_judges=True, instant=True, sandbox_root=tmp / "sandboxes")
     return store, dict(jobs)
 
 
@@ -44,22 +46,23 @@ def test_one_job_per_story_with_expected_statuses(
     store, jobs = seeded
 
     assert {name: job.status for name, job in jobs.items()} == {
-        "interrupted": JobStatus.SUCCEEDED,
-        "retried": JobStatus.SUCCEEDED,
-        "jev-retry": JobStatus.SUCCEEDED,
+        "happy-path": JobStatus.SUCCEEDED,
+        "crash-resume": JobStatus.SUCCEEDED,
+        "retry-then-pass": JobStatus.SUCCEEDED,
         "jev-stop": JobStatus.WAITING_ON_ESCALATION,
         "retry-budget": JobStatus.WAITING_ON_ESCALATION,
-        "wall-clock": JobStatus.WAITING_ON_ESCALATION,
+        "wall-clock-budget": JobStatus.WAITING_ON_ESCALATION,
+        "step-failure": JobStatus.FAILED,
         "resolved": JobStatus.WAITING_ON_ESCALATION,
-        "failed": JobStatus.FAILED,
     }
     assert len(store.list_jobs()) == len(jobs)
+    assert all(job.simulation is not None for job in store.list_jobs())
 
 
-def test_interrupted_job_resumed_at_verify_without_redoing_work(
+def test_crash_resume_job_resumed_at_verify_without_redoing_work(
     seeded: tuple[JobStore, dict[str, Job]],
 ) -> None:
-    store, job = _job(seeded, "interrupted")
+    store, job = _job(seeded, "crash-resume")
 
     checkpoints = store.list_checkpoints(job.id)
     proposes = [
@@ -76,28 +79,22 @@ def test_interrupted_job_resumed_at_verify_without_redoing_work(
     assert len(verifies_before) == 2  # the interrupted run and the resumed one
 
 
-def test_retried_job_records_fallback_when_jev_unavailable(
+def test_retry_then_pass_records_judgment_rollback_and_retry(
     seeded: tuple[JobStore, dict[str, Job]],
 ) -> None:
-    store, job = _job(seeded, "retried")
+    store, job = _job(seeded, "retry-then-pass")
 
     assert job.retry_count == 1
     assert len(_events(store, job.id, EventType.RETRY)) == 1
     assert len(_events(store, job.id, EventType.ROLLBACK)) == 1
     judgments = _events(store, job.id, EventType.JEV_JUDGMENT)
-    assert len(judgments) == 1
-    assert judgments[0].payload["output"] == {"error": "RuntimeError: JEV unavailable"}
+    assert [j.payload["outcome"] for j in judgments] == ["retry"]
 
 
-def test_jev_stories_record_judgments_and_outcomes(
-    seeded: tuple[JobStore, dict[str, Job]],
-) -> None:
-    store, retry_job = _job(seeded, "jev-retry")
-    _, stop_job = _job(seeded, "jev-stop")
+def test_jev_stop_escalates_on_judgment(seeded: tuple[JobStore, dict[str, Job]]) -> None:
+    store, stop_job = _job(seeded, "jev-stop")
 
-    retry_judgment = _events(store, retry_job.id, EventType.JEV_JUDGMENT)[0]
     stop_judgment = _events(store, stop_job.id, EventType.JEV_JUDGMENT)[0]
-    assert retry_judgment.payload["outcome"] == "retry"
     assert stop_judgment.payload["outcome"] == "escalate"
     assert [e.reason for e in store.list_escalations(stop_job.id)] == [
         EscalationReason.JEV_NOT_RETRYABLE
@@ -108,7 +105,7 @@ def test_budget_stories_escalate_with_expected_reasons(
     seeded: tuple[JobStore, dict[str, Job]],
 ) -> None:
     store, retry_budget = _job(seeded, "retry-budget")
-    _, wall_clock = _job(seeded, "wall-clock")
+    _, wall_clock = _job(seeded, "wall-clock-budget")
 
     assert [e.reason for e in store.list_escalations(retry_budget.id)] == [
         EscalationReason.RETRY_BUDGET_EXHAUSTED
@@ -130,7 +127,7 @@ def test_pending_and_resolved_escalations_both_present(
 
 
 def test_failed_job_has_step_error(seeded: tuple[JobStore, dict[str, Job]]) -> None:
-    store, job = _job(seeded, "failed")
+    store, job = _job(seeded, "step-failure")
 
     assert len(_events(store, job.id, EventType.STEP_ERROR)) == 1
 
@@ -162,7 +159,14 @@ def test_seed_cli_reset_recreates_database(tmp_path: Path) -> None:
     url = f"sqlite:///{db_file}"
     db_file.write_bytes(b"stale file from an older run")
 
-    with mock.patch.object(demo_console_seed, "WALL_CLOCK_SECONDS", 0.05):
+    def unavailable(state: dict[str, object]) -> Judgment:
+        raise RuntimeError("no network in tests")
+
+    # No real JEV call and no real waiting from the CLI path.
+    with (
+        mock.patch.object(judgment_module, "judge_verify_failure", unavailable),
+        mock.patch.object(demo_console_seed, "DEFAULT_PACING", INSTANT),
+    ):
         assert demo_console_seed.main(["--database-url", url, "--reset"]) == 0
 
     scenarios = {job.scenario for job in JobStore(url).list_jobs()}

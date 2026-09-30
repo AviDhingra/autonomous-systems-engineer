@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Tour{% endblock %}
+{% block content %}
+<h1>Tour</h1>
+<p class="lede">Six reliability patterns, one at a time. Each comes with a story you can run and watch live.</p>
+
+{# With Alpine: one step at a time. Without it: every step is listed. #}
+<div x-data="{ step: 0, total: {{ steps | length }} }">
+  <ol class="tour-progress" aria-label="Tour steps" x-show="true" style="display: none">
+    {% for s in steps %}
+    <li><button type="button" @click="step = {{ loop.index0 }}" :aria-current="step === {{ loop.index0 }} ? 'step' : null">{{ loop.index }}. {{ s.title }}</button></li>
+    {% endfor %}
+  </ol>
+
+  <ol class="tour">
+    {% for s in steps %}
+    <li class="tour-step" id="{{ s.key }}" x-show="step === {{ loop.index0 }}">
+      <p class="step-number">Step {{ loop.index }} of {{ steps | length }}</p>
+      <h2>{{ s.title }}</h2>
+      <p>{{ s.explanation }}</p>
+      <div class="tour-actions">
+        {% if s.story_name %}
+        {% set story = stories_by_name[s.story_name] %}
+        <form method="post" action="/simulations">
+          <input type="hidden" name="story" value="{{ story.name }}">
+          <button type="submit"{% if live_job_id %} disabled title="A simulated run is already in progress"{% endif %}>Run “{{ story.title }}”</button>
+        </form>
+        {% if s.latest_job %}<a class="button button-secondary" href="/jobs/{{ s.latest_job.id }}">See the latest run</a>{% endif %}
+        {% else %}
+        <a class="button" href="/escalations">See escalations waiting for a person</a>
+        {% endif %}
+      </div>
+      <div class="tour-nav" x-show="true" style="display: none">
+        <button type="button" class="button-secondary" @click="step--" :disabled="step === 0">← Previous</button>
+        <button type="button" class="button-secondary" @click="step++" :disabled="step === total - 1">Next →</button>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% endblock %}

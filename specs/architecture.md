@@ -122,10 +122,15 @@ not final) that reads from the same SQLite store and shows:
   outputs),
 - any pending escalations, with enough detail to understand and resolve them.
 
-The console is read-heavy; the only write action it needs for v1 is
-resolving/acknowledging an escalation. It runs locally, with no auth — see
-Non-goals in `mission.md`. It is demo-ready in presentation, not in
-deployment posture.
+The console is read-heavy. Its write actions are resolving/acknowledging an
+escalation (v1) and, from Milestone 6, starting and resuming **simulated**
+runs: preset stories that drive the real `run_job` with fake PROPOSE,
+APPLY, and VERIFY steps (via `run_job`'s `propose_fn` / `apply_fn` /
+`verify_fn` seams) and the real JEV judgment. The console never starts,
+resumes, or retries a real run and never calls Project 1, so it can incur
+TypeSafe (JEV) cost but never Anthropic cost. One simulated run at a time.
+It runs locally, with no auth — see Non-goals in `mission.md`. It is
+demo-ready in presentation, not in deployment posture.
 
 ## Entrypoints
 

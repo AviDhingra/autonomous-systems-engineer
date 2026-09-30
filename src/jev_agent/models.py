@@ -58,6 +58,8 @@ class Job:
     updated_at: datetime
     retry_count: int = 0
     budget: Budget = DEFAULT_BUDGET
+    # Console story driving a simulated run; None for a real run.
+    simulation: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,27 +2,69 @@
 {% from "_macros.html" import badge %}
 {% block title %}Jobs{% endblock %}
 {% block content %}
-<h1>Jobs</h1>
-<p class="lede">Each job is one governed run of the repair pipeline: propose, apply, verify.</p>
+<div class="section-head">
+  <div>
+    <h1>Jobs</h1>
+    <p class="lede">Each job is one governed run of the repair pipeline: propose, apply, verify.</p>
+  </div>
+  <a class="button" href="/#run" @click.prevent="$refs.run.showModal()">Run a scenario</a>
+</div>
+
+<form method="get" action="/jobs" class="filters" role="search" @change="$el.requestSubmit()">
+  <label>Status
+    <select name="status">
+      <option value="">Any</option>
+      {% for value, label in statuses %}
+      <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Kind
+    <select name="kind">
+      <option value="">Any</option>
+      <option value="simulated"{% if filters.kind == "simulated" %} selected{% endif %}>Simulated</option>
+      <option value="real"{% if filters.kind == "real" %} selected{% endif %}>Real</option>
+    </select>
+  </label>
+  <label>Story
+    <select name="story">
+      <option value="">Any</option>
+      {% for story in stories %}
+      <option value="{{ story.name }}"{% if filters.story == story.name %} selected{% endif %}>{{ story.title }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="grow">Job id
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="Starts with, e.g. 3f2a" autocomplete="off">
+  </label>
+  <button type="submit">Filter</button>
+  {% if filtered %}<a class="button button-secondary" href="/jobs">Clear</a>{% endif %}
+</form>
+
 {% if rows %}
-<table class="jobs">
-  <thead>
-    <tr><th>Job</th><th>Scenario</th><th>Status</th><th>Retries</th><th>Elapsed</th><th>Created (UTC)</th></tr>
-  </thead>
-  <tbody>
-  {% for row in rows %}
-    <tr>
-      <td><a href="/jobs/{{ row.job.id }}"><code>{{ row.job.id[:8] }}</code></a></td>
-      <td>{{ row.job.scenario }}</td>
-      <td>{{ badge(row.badge, row.label) }}</td>
-      <td>{{ row.job.retry_count }} / {{ row.job.budget.max_retries }}</td>
-      <td>{{ row.elapsed }}</td>
-      <td>{{ row.job.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
+<p class="result-count">{{ rows | length }} job{{ '' if rows | length == 1 else 's' }}{% if filtered %} match{% endif %}</p>
+<div class="table-wrap">
+  <table class="jobs">
+    <thead>
+      <tr><th>Job</th><th>What</th><th>Status</th><th>Retries</th><th>Elapsed</th><th>Created (UTC)</th></tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td><a href="/jobs/{{ row.job.id }}"><code>{{ row.job.id[:8] }}</code></a></td>
+        <td>{% if row.story_title %}<span class="tag">Simulated</span> {{ row.story_title }}{% else %}{{ row.job.scenario }}{% endif %}</td>
+        <td>{{ badge(row.badge, row.label) }}</td>
+        <td class="num">{{ row.job.retry_count }} / {{ row.job.budget.max_retries }}</td>
+        <td class="num">{{ row.elapsed }}</td>
+        <td class="num">{{ row.job.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% elif filtered %}
+<p class="empty">No jobs match these filters. <a href="/jobs">Clear filters</a></p>
 {% else %}
-<p class="empty">No jobs yet. Seed a demo database with <code>python -m jev_agent.demo_console_seed</code>.</p>
+<p class="empty">No jobs yet. <a href="/#run">Run a scenario</a> or seed a demo database with <code>python -m jev_agent.demo_console_seed</code>.</p>
 {% endif %}
 {% endblock %}

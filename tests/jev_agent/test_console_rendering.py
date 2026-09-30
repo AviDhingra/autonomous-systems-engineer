@@ -242,7 +242,7 @@ def test_escalation_view_readable_facts() -> None:
     assert view.reason_label == "Wall-clock budget exceeded"
     assert view.retries == "1 of 3"
     assert view.elapsed == "11m 40s of 10m 0s"
-    assert view.judgment == "none consulted"
+    assert view.judgment == "no usable judgment"
     assert view.failure_output == "boom"
     assert not view.resolved
 
@@ -274,16 +274,15 @@ def test_step_view_notes_resume_after_interruption() -> None:
 
 
 def test_seeded_interrupted_job_page_shows_resume(tmp_path: Path) -> None:
-    from unittest import mock
-
     from jev_agent import demo_console_seed
 
     url = f"sqlite:///{tmp_path / 'resume.db'}"
     store = JobStore(url)
-    with mock.patch.object(demo_console_seed, "WALL_CLOCK_SECONDS", 0.05):
-        jobs = demo_console_seed.seed_demo(store)
+    jobs = demo_console_seed.seed_demo(
+        store, stand_in_judges=True, instant=True, sandbox_root=tmp_path / "sandboxes"
+    )
 
-    page = TestClient(create_app(url)).get(f"/jobs/{jobs['interrupted'].id}").text
+    page = TestClient(create_app(url)).get(f"/jobs/{jobs['crash-resume'].id}").text
 
     assert "resumed after interruption" in page
-    assert page.count("Attempt ") == 1
+    assert page.count('class="track"') == 1

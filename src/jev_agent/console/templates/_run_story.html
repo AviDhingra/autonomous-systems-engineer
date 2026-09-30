@@ -1,0 +1,17 @@
+{# The "Run a scenario" chooser: one form per story. Expects `stories` and `live_job_id`. #}
+<div class="story-grid">
+  {% for story in stories %}
+  <form method="post" action="/simulations" class="story-card" x-data="{ busy: false }" @submit="busy = true">
+    <input type="hidden" name="story" value="{{ story.name }}">
+    <p class="story-pattern">{{ story.pattern }}</p>
+    <h3>{{ story.title }}</h3>
+    <p>{{ story.summary }}</p>
+    <button type="submit" :disabled="busy || {{ 'true' if live_job_id else 'false' }}"{% if live_job_id %} disabled title="A simulated run is already in progress"{% endif %}>
+      <span x-show="!busy">Run this story</span><span x-show="busy" style="display: none">Starting…</span>
+    </button>
+  </form>
+  {% endfor %}
+</div>
+{% if live_job_id %}
+<p class="hint">A simulated run is in progress: <a href="/jobs/{{ live_job_id }}">watch it</a>. Only one runs at a time.</p>
+{% endif %}

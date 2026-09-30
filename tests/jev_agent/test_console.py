@@ -50,7 +50,7 @@ def _escalated(store: JobStore, scenario: str = "S02-unsupported-patch-fields"):
 
 
 def test_job_list_empty_state(client: TestClient) -> None:
-    response = client.get("/")
+    response = client.get("/jobs")
 
     assert response.status_code == 200
     assert "No jobs yet" in response.text
@@ -61,7 +61,7 @@ def test_job_list_shows_every_job_and_status(client: TestClient, store: JobStore
     store.update_job_status(done.id, JobStatus.SUCCEEDED)
     waiting, _ = _escalated(store, "S-waiting")
 
-    response = client.get("/")
+    response = client.get("/jobs")
 
     assert response.status_code == 200
     assert "S-done" in response.text
@@ -120,10 +120,10 @@ def test_pending_escalations_page(client: TestClient, store: JobStore) -> None:
 
     assert response.status_code == 200
     pending_part, resolved_part = response.text.split("<h2>Resolved</h2>")
-    assert f"#{escalation.id}" in pending_part
-    assert f"#{resolved.id}" not in pending_part
+    assert f"#{escalation.id} ·" in pending_part
+    assert f"#{resolved.id} ·" not in pending_part
     assert "boom" in pending_part
-    assert f"#{resolved.id}" in resolved_part
+    assert f"#{resolved.id} ·" in resolved_part
     assert "handled it" in resolved_part
     assert f"/jobs/{job.id}" in pending_part
     assert resolved_job.id[:8] in resolved_part
@@ -148,7 +148,7 @@ def test_resolve_records_and_redirects_and_leaves_job_waiting(
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == f"/jobs/{job.id}"
+    assert response.headers["location"] == f"/jobs/{job.id}?notice=resolved"
     resolved = store.get_escalation(escalation.id)
     assert resolved is not None
     assert resolved.resolution_note == "looked into it"

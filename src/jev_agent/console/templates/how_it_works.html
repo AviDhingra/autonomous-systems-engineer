@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}How it works{% endblock %}
+{% macro node(x, y, actor, label, sub) -%}
+<g class="actor-{{ actor }}">
+  <rect class="node" x="{{ x }}" y="{{ y }}" width="210" height="80" rx="10"/>
+  <text class="label" x="{{ x + 16 }}" y="{{ y + 33 }}">{{ label }}</text>
+  <text class="sub" x="{{ x + 16 }}" y="{{ y + 56 }}">{{ sub }}</text>
+</g>
+{%- endmacro %}
+{% block content %}
+<h1>How it works</h1>
+<p class="lede">Every job runs the same governed loop. The frontier model does the reasoning. Plain, deterministic Python decides what happens, and it is the only thing that ever changes a job's state.</p>
+
+<figure class="diagram">
+  <svg viewBox="0 0 1000 480" role="img" aria-labelledby="loop-title loop-desc">
+    <title id="loop-title">The governed repair loop</title>
+    <desc id="loop-desc">Propose, then Apply, then Verify. If Verify passes, the job succeeds. If it fails, JEV judges whether the failure is retryable and deterministic policy decides: retry after rolling back, escalate to a person, or fail. Budgets constrain policy, and every step is checkpointed so a crashed job resumes without redoing work.</desc>
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path class="arrow" d="M0,0 L10,5 L0,10 z"/>
+      </marker>
+    </defs>
+
+    {# Row 1: the pipeline #}
+    {{ node(20, 30, "model", "Propose", "Frontier model") }}
+    {{ node(290, 30, "python", "Apply", "Python · saves original first") }}
+    {{ node(560, 30, "python", "Verify", "Python · pytest, Ruff, mypy") }}
+    <g>
+      <rect class="node-outcome" x="830" y="40" width="150" height="60" rx="30"/>
+      <circle class="dot-good" cx="856" cy="70" r="7"/>
+      <text class="label" x="872" y="76">Succeeded</text>
+    </g>
+    <path class="edge" d="M230,70 H286" marker-end="url(#arrow)"/>
+    <path class="edge" d="M500,70 H556" marker-end="url(#arrow)"/>
+    <path class="edge" d="M770,70 H826" marker-end="url(#arrow)"/>
+    <text class="edge-label" x="778" y="60">passes</text>
+
+    {# The checkpoint store underpins every step #}
+    <rect class="node-store" x="20" y="132" width="750" height="36" rx="8"/>
+    <text class="sub" x="395" y="155" text-anchor="middle">Checkpoint store · every step recorded before and after</text>
+
+    {# Row 2: judgment and decision #}
+    {{ node(560, 230, "jev", "JEV judgment", "Retryable? Advice only") }}
+    {{ node(290, 230, "policy", "Policy decides", "Deterministic Python") }}
+    <path class="edge" d="M665,110 V226" marker-end="url(#arrow)"/>
+    <text class="edge-label" x="675" y="205">fails</text>
+    <path class="edge" d="M560,270 H504" marker-end="url(#arrow)"/>
+
+    {# Retry loops back to Propose #}
+    <path class="edge" d="M290,270 H125 V114" marker-end="url(#arrow)"/>
+    <text class="edge-label" x="136" y="215">retry</text>
+    <text class="sub" x="136" y="233">roll back first</text>
+
+    {# Row 3: escalate, fail, budgets #}
+    {{ node(290, 390, "human", "Person", "Resolves the escalation") }}
+    <path class="edge" d="M395,310 V386" marker-end="url(#arrow)"/>
+    <text class="edge-label" x="405" y="355">escalate</text>
+
+    <g>
+      <rect class="node-outcome" x="20" y="400" width="150" height="60" rx="30"/>
+      <circle class="dot-critical" cx="46" cy="430" r="7"/>
+      <text class="label" x="62" y="436">Failed</text>
+    </g>
+    <path class="edge" d="M300,310 L174,412" marker-end="url(#arrow)"/>
+    <text class="edge-label" x="190" y="340">a step raised</text>
+
+    <g>
+      <rect class="node-store" x="560" y="390" width="210" height="70" rx="10"/>
+      <text class="label" x="576" y="420">Budgets</text>
+      <text class="sub" x="576" y="443">max retries · max wall-clock time</text>
+    </g>
+    <path class="edge-dashed" d="M560,410 L480,314" marker-end="url(#arrow)"/>
+  </svg>
+</figure>
+
+<h2>Who holds authority</h2>
+<div class="explain-grid actor-cards">
+  {% for actor in actors.values() %}
+  <div class="card actor-{{ actor.key }}">
+    <h3>{{ actor.label }}</h3>
+    <p>{{ actor.role }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<h2>Step by step</h2>
+<div class="explain-grid">
+  <div class="card"><h3>1 · Propose</h3><p>The frontier model reads the ticket, searches the code, and proposes one file replacement. That is its whole job.</p></div>
+  <div class="card"><h3>2 · Apply</h3><p>Python saves the file's original content, then writes the proposed change, so a failed attempt can always be rolled back.</p></div>
+  <div class="card"><h3>3 · Verify</h3><p>Python runs pytest, Ruff and mypy. If all pass, the job succeeds. If not, a decision is needed.</p></div>
+  <div class="card"><h3>4 · Judge</h3><p>JEV answers one narrow question: is this failure worth retrying? It returns a classification and a confidence, nothing more.</p></div>
+  <div class="card"><h3>5 · Decide</h3><p>Policy checks the budgets first, then weighs JEV's answer. It retries (after rolling back), escalates to a person, or fails the job. If JEV is unavailable or unsure, a fixed rule applies.</p></div>
+  <div class="card"><h3>6 · Recover</h3><p>Every step is checkpointed. If the process dies, the job resumes at the first step without a durable result. Completed work is never redone.</p></div>
+</div>
+
+<p class="tour-actions"><a class="button" href="/tour">Take the tour</a> <a class="button button-secondary" href="/#run">Run a scenario</a></p>
+{% endblock %}

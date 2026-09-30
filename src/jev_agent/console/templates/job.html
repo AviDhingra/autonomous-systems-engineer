@@ -1,21 +1,53 @@
 {% extends "base.html" %}
-{% from "_macros.html" import escalation_card %}
+{% from "_macros.html" import escalation_card, actor_chip %}
 {% block title %}Job {{ job.id[:8] }}{% endblock %}
 {% block content %}
-<p class="crumb"><a href="/">&larr; All jobs</a></p>
-<h1>Job <code>{{ job.id[:8] }}</code></h1>
-<p class="lede">{{ job.scenario }} · created {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</p>
+<p class="crumb"><a href="/jobs">&larr; All jobs</a></p>
+<div class="job-head">
+  <div>
+    <h1>Job <code>{{ job.id[:8] }}</code>{% if story %} <span class="tag">Simulated</span>{% endif %}</h1>
+    <p class="lede">
+      {% if story %}<strong>{{ story.title }}.</strong> {{ story.summary }}{% else %}{{ job.scenario }}{% endif %}
+      <br><span class="muted">Created {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC</span>
+    </p>
+  </div>
+</div>
 
-{% include "fragments/status.html" %}
+<div class="job-grid">
+  <div>
+    {% include "fragments/status.html" %}
 
-{% if escalations %}
-<section>
-  <h2>Escalations</h2>
-  {% for view in escalations %}
-  {{ escalation_card(view) }}
-  {% endfor %}
-</section>
-{% endif %}
+    {% if escalations %}
+    <section aria-labelledby="esc-title">
+      <h2 id="esc-title">Escalations</h2>
+      <div class="escalation-list">
+        {% for view in escalations %}
+        {{ escalation_card(view) }}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
 
-{% include "fragments/history.html" %}
+    <details class="history-box">
+      <summary>Execution history <span class="muted">(every event, as recorded)</span></summary>
+      {% include "fragments/history.html" %}
+    </details>
+  </div>
+
+  <aside class="aside" aria-label="Legend">
+    <div class="panel">
+      <h3>Who does what</h3>
+      <ul class="legend">
+        {% for actor in actors.values() %}
+        <li>{{ actor_chip(actor) }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Reading this page</h3>
+      <p class="hint">Each attempt runs Propose → Apply → Verify. When Verify fails, the decision below it shows what JEV advised, what policy decided and why, and the budget at that moment.</p>
+      <p class="hint"><a href="/how-it-works">How it works</a></p>
+    </div>
+  </aside>
+</div>
 {% endblock %}

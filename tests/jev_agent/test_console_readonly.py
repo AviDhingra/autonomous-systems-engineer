@@ -1,4 +1,5 @@
-"""The console may only write by resolving an escalation."""
+"""The console writes only by resolving escalations and starting or resuming
+simulated runs; every page view leaves the store unchanged."""
 
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from jev_agent.models import EscalationReason, JobStatus
 from jev_agent.store import JobStore
 
 
-def test_only_route_that_writes_is_resolve_post(tmp_path: Path) -> None:
+def test_only_write_routes_are_resolve_start_and_resume(tmp_path: Path) -> None:
     app = create_app(f"sqlite:///{tmp_path / 'ro_routes.db'}")
 
     # OpenAPI lists every operation, including routes from included routers.
@@ -22,7 +23,11 @@ def test_only_route_that_writes_is_resolve_post(tmp_path: Path) -> None:
         if method.lower() != "get"
     }
 
-    assert non_get == {("POST", "/escalations/{escalation_id}/resolve")}
+    assert non_get == {
+        ("POST", "/escalations/{escalation_id}/resolve"),
+        ("POST", "/simulations"),
+        ("POST", "/jobs/{job_id}/resume"),
+    }
 
 
 def _counts(store: JobStore) -> tuple[int, int, int, int, str]:
@@ -46,7 +51,7 @@ def test_get_routes_do_not_change_the_store(tmp_path: Path) -> None:
     before = _counts(store)
     client = TestClient(create_app(url))
 
-    paths = ["/", "/escalations", "/static/console.css"]
+    paths = ["/", "/how-it-works", "/tour", "/jobs", "/escalations", "/static/console.css"]
     for job_id in (job.id, escalated.id):
         paths += [f"/jobs/{job_id}", f"/jobs/{job_id}/status", f"/jobs/{job_id}/history"]
     for path in paths:
@@ -56,22 +61,17 @@ def test_get_routes_do_not_change_the_store(tmp_path: Path) -> None:
 
 
 def test_seeded_demo_database_is_unchanged_by_browsing(tmp_path: Path) -> None:
-    from unittest import mock
-
-    from jev_agent import demo_console_seed
-
     url = f"sqlite:///{tmp_path / 'ro_seeded.db'}"
     store = JobStore(url)
-    with mock.patch.object(demo_console_seed, "WALL_CLOCK_SECONDS", 0.05):
-        seed_demo(store)
+    seed_demo(store, stand_in_judges=True, instant=True, sandbox_root=tmp_path / "sandboxes")
     before = _counts(store)
     client = TestClient(create_app(url))
 
     for job in store.list_jobs():
         for suffix in ("", "/status", "/history"):
             assert client.get(f"/jobs/{job.id}{suffix}").status_code == 200
-    client.get("/")
-    client.get("/escalations")
+    for path in ("/", "/how-it-works", "/tour", "/jobs", "/escalations"):
+        assert client.get(path).status_code == 200, path
 
     assert _counts(store) == before
 

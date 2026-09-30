@@ -84,6 +84,21 @@ retry, JEV-informed decision, budget-triggered escalation) is observable
 end-to-end through the console, in a form presentable to someone other than
 just the person who built it.
 
+## Milestone 6 — Console experience (post-v1)
+
+Spec: `specs/2026-09-29-console-experience/`.
+
+- Turn the console into an interactive web app a first-time visitor
+  understands: overview dashboard, "How it works" diagram, per-job pipeline
+  stepper with decision nodes, guided tour.
+- Start simulated runs (preset stories) from the UI and watch them live;
+  real JEV judgment, fake PROPOSE/APPLY/VERIFY; resume interrupted runs.
+- `run_job` gains `propose_fn` / `apply_fn` injection seams.
+
+**Exit criteria:** every reliability pattern can be triggered and watched
+live from the console, and someone who hasn't seen the project can explain
+its purpose after five minutes with it.
+
 ## After v1
 
 Not planned in detail yet. Candidates noted for later, not committed:
